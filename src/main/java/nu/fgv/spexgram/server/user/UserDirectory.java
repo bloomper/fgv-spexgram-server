@@ -24,27 +24,24 @@ import nu.fgv.spexgram.server.util.error.DirectoryUnavailableException;
 import nu.fgv.spexgram.server.util.security.SecurityUtil;
 import org.jspecify.annotations.Nullable;
 import org.keycloak.admin.client.Keycloak;
-import org.keycloak.admin.client.resource.UserResource;
-import org.keycloak.representations.idm.ClientMappingsRepresentation;
-import org.keycloak.representations.idm.MappingsRepresentation;
-import org.keycloak.representations.idm.RoleRepresentation;
+import org.keycloak.admin.client.resource.RealmResource;
+import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Supplier;
 
 /**
  * Email addresses for notifications, read in Keycloak as {@code fgv-spexgram-service}, which has only
- * {@code realm-management}'s {@code view-users}. That role cannot list a client's role holders, so editors are found
- * among the people who have used Spexgram with {@code EDITOR} or {@code ADMIN} ({@link AppUser#isEditor()}) and
- * confirmed in Keycloak: enabled, with an email address and the role still held. Every failure, unreachable or refused,
- * is a {@link DirectoryUnavailableException}; addresses are never logged.
+ * {@code realm-management}'s {@code view-users} and {@code view-clients}, which let it read who holds a role on
+ * {@code fgv-spexgram}. Every failure, unreachable or refused, is a {@link DirectoryUnavailableException}; addresses
+ * are never logged.
  *
  * @author Anders Jacobsson
  * @since 1.0
@@ -52,16 +49,14 @@ import java.util.function.Supplier;
 @Component
 public class UserDirectory {
 
-    private static final Set<String> EDITOR_ROLES = Set.of(Role.EDITOR.name(), Role.ADMIN.name());
+    private static final int MAX_EDITORS = 200;
 
     private final Keycloak keycloak;
     private final String realm;
-    private final AppUserRepository userRepository;
 
-    public UserDirectory(final Keycloak keycloak, final SpexgramProperties properties, final AppUserRepository userRepository) {
+    public UserDirectory(final Keycloak keycloak, final SpexgramProperties properties) {
         this.keycloak = keycloak;
         this.realm = properties.keycloak().realm();
-        this.userRepository = userRepository;
     }
 
     private static <T> T call(final Supplier<T> action) {
@@ -84,27 +79,28 @@ public class UserDirectory {
     }
 
     /**
-     * Editors and admins to tell of new reports.
+     * Editors and admins to tell of new reports: everyone holding {@code EDITOR} or {@code ADMIN} on
+     * {@code fgv-spexgram} directly, enabled and with an email address, each once.
      */
     public List<Recipient> editors() {
-        final List<Recipient> editors = new ArrayList<>();
+        return call(() -> {
+            final RealmResource realm = keycloak.realm(this.realm);
+            final List<ClientRepresentation> clients = realm.clients().findByClientId(SecurityUtil.CLIENT_ID);
 
-        for (final AppUser candidate : userRepository.findByEditorTrue()) {
-            call(() -> {
-                final UserResource user = keycloak.realm(realm).users().get(candidate.getSubject());
-                final MappingsRepresentation mappings = user.roles().getAll();
-                final ClientMappingsRepresentation client = mappings.getClientMappings() == null ? null
-                        : mappings.getClientMappings().get(SecurityUtil.CLIENT_ID);
-                final boolean editor = client != null && client.getMappings() != null
-                        && client.getMappings().stream().map(RoleRepresentation::getName).anyMatch(EDITOR_ROLES::contains);
+            if (clients.isEmpty()) {
+                throw new IllegalStateException("The realm has no client " + SecurityUtil.CLIENT_ID);
+            }
 
-                if (editor) {
-                    recipient(user.toRepresentation()).ifPresent(editors::add);
+            final Map<String, Recipient> editors = new LinkedHashMap<>();
+
+            for (final Role role : List.of(Role.EDITOR, Role.ADMIN)) {
+                for (final UserRepresentation user : realm.clients().get(clients.getFirst().getId()).roles().get(role.name())
+                        .getUserMembers(false, 0, MAX_EDITORS)) {
+                    recipient(user).ifPresent(recipient -> editors.putIfAbsent(user.getId(), recipient));
                 }
-                return null;
-            });
-        }
-        return editors;
+            }
+            return List.copyOf(editors.values());
+        });
     }
 
     /**

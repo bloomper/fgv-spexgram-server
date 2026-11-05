@@ -322,24 +322,24 @@ public class SampleDataImporter {
         final String clientUuid = client.toRepresentation().getId();
         final Map<String, AppUser> users = new LinkedHashMap<>();
 
-        users.put(ADMIN, grant(realm, client, clientUuid, spexregisterUser(realm, ADMIN), true, "USER", "EDITOR", "ADMIN"));
-        users.put(EDITOR, grant(realm, client, clientUuid, spexregisterUser(realm, EDITOR), true, "USER", "EDITOR"));
-        users.put(USER, grant(realm, client, clientUuid, spexregisterUser(realm, USER), false, "USER"));
-        users.put(NO_ACCESS, recordUser(noAccessUser(realm), false));
+        users.put(ADMIN, grant(realm, client, clientUuid, spexregisterUser(realm, ADMIN), "USER", "EDITOR", "ADMIN"));
+        users.put(EDITOR, grant(realm, client, clientUuid, spexregisterUser(realm, EDITOR), "USER", "EDITOR"));
+        users.put(USER, grant(realm, client, clientUuid, spexregisterUser(realm, USER), "USER"));
+        users.put(NO_ACCESS, recordUser(noAccessUser(realm)));
         return users;
     }
 
     private AppUser grant(final RealmResource realm, final ClientResource client, final String clientUuid,
-                          final UserRepresentation user, final boolean editor, final String... roles) {
+                          final UserRepresentation user, final String... roles) {
         final List<RoleRepresentation> representations = Arrays.stream(roles)
                 .map(role -> client.roles().get(role).toRepresentation())
                 .toList();
 
         realm.users().get(user.getId()).roles().clientLevel(clientUuid).add(representations);
-        return recordUser(user, editor);
+        return recordUser(user);
     }
 
-    private AppUser recordUser(final UserRepresentation representation, final boolean editor) {
+    private AppUser recordUser(final UserRepresentation representation) {
         final Instant now = clock.instant();
         final AppUser user = new AppUser();
 
@@ -347,7 +347,6 @@ public class SampleDataImporter {
         user.setUsername(representation.getUsername());
         user.setDisplayName(representation.getFirstName());
         user.setEmail(representation.getEmail());
-        user.setEditor(editor);
         user.setCreatedAt(now);
         user.setLastSeenAt(now);
         return Objects.requireNonNull(transactionTemplate.execute(_ -> userRepository.save(user)));

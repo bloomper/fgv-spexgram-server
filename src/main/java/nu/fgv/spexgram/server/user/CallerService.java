@@ -44,8 +44,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Resolves the caller from the access token, and records people who log in so that editors can be told of reports and
- * contributors of reviews. Records are deleted 36 months after the person was last seen (section 7 of the spec).
+ * Resolves the caller from the access token, and records people who log in so that admins can see who uses Spexgram. Records are deleted 36 months after the person was last seen (section 7 of the spec).
  *
  * @author Anders Jacobsson
  * @since 1.0
@@ -117,7 +116,7 @@ public class CallerService {
     }
 
     /**
-     * Records the caller as a user, or refreshes their username, name, email, editor flag and when they were last seen.
+     * Records the caller as a user, or refreshes their username, name, email and when they were last seen.
      */
     public AppUser record(final Caller caller) {
         try {
@@ -143,12 +142,10 @@ public class CallerService {
                 || !caller.username().equals(user.getUsername())
                 || !Objects.equals(caller.displayName(), user.getDisplayName())
                 || !Objects.equals(caller.email(), user.getEmail())
-                || caller.isEditor() != user.isEditor()
                 || user.getLastSeenAt().plus(LAST_SEEN_RESOLUTION).isBefore(now)) {
             user.setUsername(caller.username());
             user.setDisplayName(caller.displayName());
             user.setEmail(caller.email());
-            user.setEditor(caller.isEditor());
             user.setLastSeenAt(now);
             return repository.save(user);
         }

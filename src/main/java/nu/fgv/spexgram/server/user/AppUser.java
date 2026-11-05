@@ -57,12 +57,6 @@ public class AppUser {
     @Column(name = "email")
     private @Nullable String email;
 
-    /**
-     * Whether their latest token had {@code EDITOR} or {@code ADMIN}, which Keycloak confirms before they are emailed.
-     */
-    @Column(name = "editor", nullable = false)
-    private boolean editor;
-
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

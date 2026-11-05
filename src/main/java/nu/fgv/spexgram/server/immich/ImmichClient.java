@@ -37,6 +37,7 @@ import tools.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -73,6 +74,9 @@ public class ImmichClient {
     public static final String API_KEY_HEADER = "x-api-key";
     static final int PAGE = 1000;
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    // Immich does not take the JDK client's upgrade to HTTP/2 on plain HTTP well
+    private static final ClientHttpRequestFactoryBuilder<?> IMMICH_HTTP = ClientHttpRequestFactoryBuilder.jdk()
+            .withHttpClientCustomizer(client -> client.version(HttpClient.Version.HTTP_1_1));
 
     private final RestClient rest;
     private final RestClient transfer;
@@ -83,14 +87,14 @@ public class ImmichClient {
 
         this.rest = builder.clone()
                 .baseUrl(baseUrl)
-                .requestFactory(ClientHttpRequestFactoryBuilder.jdk().build(HttpClientSettings.defaults()
+                .requestFactory(IMMICH_HTTP.build(HttpClientSettings.defaults()
                         .withConnectTimeout(CONNECT_TIMEOUT)
                         .withReadTimeout(Duration.ofSeconds(30))))
                 .build();
         // Uploads and zips of whole albums take longer
         this.transfer = builder.clone()
                 .baseUrl(baseUrl)
-                .requestFactory(ClientHttpRequestFactoryBuilder.jdk().build(HttpClientSettings.defaults()
+                .requestFactory(IMMICH_HTTP.build(HttpClientSettings.defaults()
                         .withConnectTimeout(CONNECT_TIMEOUT)
                         .withReadTimeout(Duration.ofMinutes(30))))
                 .build();

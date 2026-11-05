@@ -24,6 +24,7 @@ import nu.fgv.spexgram.server.immich.ImmichClient;
 import nu.fgv.spexgram.server.immich.ImmichUnavailableException;
 import nu.fgv.spexgram.server.settings.SettingsService;
 import nu.fgv.spexgram.server.visibility.Visibility;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -145,28 +146,33 @@ public class ItemProcessing {
                 .orElse(false);
         final long maxVideoMs = Duration.ofMinutes(settingsService.current().getMaxVideoMinutes()).toMillis();
 
-        transactionTemplate.executeWithoutResult(_ -> {
-            final Item item = repository.findById(itemId).orElse(null);
+        try {
+            transactionTemplate.executeWithoutResult(_ -> {
+                final Item item = repository.findById(itemId).orElse(null);
 
-            if (item == null || item.getStatus() != ItemStatus.PROCESSING || !assetId.equals(item.getImmichAssetId())) {
-                return;
-            }
-            if (asset.isEmpty()) {
-                fail(item, ItemFailure.MISSING);
-                return;
-            }
-            copy(asset.get(), item);
-            if (asset.get().video() && item.getDurationMs() != null && item.getDurationMs() > maxVideoMs) {
-                immichClient.delete(List.of(assetId));
-                item.setImmichAssetId(null);
-                fail(item, ItemFailure.TOO_LONG);
-            } else if (ready) {
-                item.setStatus(ItemStatus.READY);
-                item.setProcessingSince(null);
-            } else if (item.getProcessingSince() != null && item.getProcessingSince().plus(GIVE_UP).isBefore(clock.instant())) {
-                fail(item, ItemFailure.NOT_PROCESSED);
-            }
-        });
+                if (item == null || item.getStatus() != ItemStatus.PROCESSING || !assetId.equals(item.getImmichAssetId())) {
+                    return;
+                }
+                if (asset.isEmpty()) {
+                    fail(item, ItemFailure.MISSING);
+                    return;
+                }
+                copy(asset.get(), item);
+                if (asset.get().video() && item.getDurationMs() != null && item.getDurationMs() > maxVideoMs) {
+                    immichClient.delete(List.of(assetId));
+                    item.setImmichAssetId(null);
+                    fail(item, ItemFailure.TOO_LONG);
+                } else if (ready) {
+                    item.setStatus(ItemStatus.READY);
+                    item.setProcessingSince(null);
+                } else if (item.getProcessingSince() != null && item.getProcessingSince().plus(GIVE_UP).isBefore(clock.instant())) {
+                    fail(item, ItemFailure.NOT_PROCESSED);
+                }
+            });
+        } catch (final OptimisticLockingFailureException e) {
+            // An editor changed the item meanwhile; the next poll looks again
+            log.debug("Item {} changed while it was checked", itemId);
+        }
     }
 
     /**

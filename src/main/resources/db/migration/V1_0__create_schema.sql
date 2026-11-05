@@ -9,8 +9,6 @@ CREATE TABLE app_user
     username     VARCHAR(255) NOT NULL,
     display_name VARCHAR(255) NULL,
     email        VARCHAR(255) NULL,
-    -- Whether their latest token had EDITOR or ADMIN; candidates for editors' notifications, checked in Keycloak
-    editor       BIT          NOT NULL DEFAULT 0,
     created_at   DATETIME(6)  NOT NULL,
     last_seen_at DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),
@@ -202,7 +200,7 @@ CREATE TABLE report
     reporter_name    VARCHAR(255)  NULL,
     visitor_email    VARCHAR(255)  NULL,
     locale           VARCHAR(10)   NOT NULL,
-    reason           VARCHAR(20)   NOT NULL,
+    reason           VARCHAR(30)   NOT NULL,
     message          VARCHAR(2000) NULL,
     status           VARCHAR(20)   NOT NULL,
     -- The item's visibility before the report hid it, restored when it is kept or corrected

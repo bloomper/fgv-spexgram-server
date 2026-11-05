@@ -19,7 +19,6 @@ package nu.fgv.spexgram.server.user;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -31,8 +30,6 @@ import java.util.Optional;
 public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     Optional<AppUser> findBySubject(String subject);
-
-    List<AppUser> findByEditorTrue();
 
     long deleteByLastSeenAtBefore(Instant before);
 }
