@@ -1,0 +1,31 @@
+= Spexgram Server
+:doctype: book
+:icons: font
+:source-highlighter: highlightjs
+
+[[introduction]]
+== Introduction
+
+Spexgram Server is the backend of Spexgram, FGV's archive of photos and short videos, kept in Immich behind it.
+
+The purpose of this documentation is to provide details on how to develop within Spexgram Server and how to integrate Spexgram Server into another application, e.g. a web application.
+
+[[getting_started]]
+== Getting started
+
+Refer to the xref:getting-started.adoc[getting started guide].
+
+[[graphql_api_guide]]
+== GraphQL API guide
+
+Refer to the xref:graphql-api-guide.adoc[API guide].
+
+[[http_api_guide]]
+== HTTP API guide
+
+Refer to the xref:api-guide.adoc[API guide].
+
+[[javadoc]]
+== Javadoc
+
+Javadoc can be found link:javadoc/index.html[here].

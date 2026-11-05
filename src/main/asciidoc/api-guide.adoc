@@ -1,0 +1,124 @@
+= Spexgram Server HTTP API Guide
+:doctype: book
+:icons: font
+:source-highlighter: highlightjs
+:toc: left
+:toclevels: 4
+
+xref:index.adoc[Back to start page]
+
+[[introduction]]
+== Introduction
+
+Spexgram Server's API is xref:graphql-api-guide.adoc[GraphQL].
+A few endpoints are plain HTTP, for what GraphQL does not suit: resumable uploads and albums as zips.
+Like GraphQL, they are thin adapters over the services, which decide who may do what.
+Photos and videos are never served by Spexgram Server, but by the <<media_server,media server>>.
+
+[[http_verbs]]
+== HTTP verbs
+
+|===
+| Verb | Usage
+
+| `GET`
+| Used to download an album as a zip
+
+| `HEAD`
+| Used to read an upload's offset
+
+| `POST`
+| Used to create an upload
+
+| `PATCH`
+| Used to send a chunk of an upload
+
+| `DELETE`
+| Used to cancel an upload
+
+| `OPTIONS`
+| Used to read the upload endpoint's capabilities
+|===
+
+[[http_status_codes]]
+== HTTP status codes
+
+|===
+| Status code | Usage
+
+| `200 OK`
+| The request completed successfully.
+
+| `201 Created`
+| An upload has been created.
+
+| `204 No Content`
+| There is nothing to return, e.g. a chunk has been stored or an upload cancelled.
+
+| `400 Bad Request`
+| The request was malformed, e.g. an upload larger than allowed or past the member's daily contribution limit.
+
+| `401 Unauthorized`
+| The request has no valid access token.
+
+| `403 Forbidden`
+| The user lacks the role the request requires, or may not download originals.
+
+| `404 Not Found`
+| The requested resource does not exist, or the user may not see it.
+
+| `409 Conflict`
+| A chunk does not start where the upload stands.
+
+| `503 Service Unavailable`
+| A service the request depends on, such as Immich, cannot be reached.
+|===
+
+[[errors]]
+== Errors
+
+Whenever an error response (status code >= 400) is returned, the body is a JSON object with the same codes as the GraphQL API:
+
+include::{snippets}/error/response-fields.adoc[]
+
+For example, the zip of an album that does not exist, or that the user may not see, produces a `404 Not Found` response:
+
+include::{snippets}/error/http-response.adoc[]
+
+[[roles]]
+== Roles
+
+Every endpoint requires an access token from the `fgv-spexgram` client with the `USER` client role, as in the xref:graphql-api-guide.adoc#roles[GraphQL API].
+Members upload contributions within their daily limit; editors upload to any album.
+
+[[resources]]
+== Resources
+
+Spexgram Server uses the following resources:
+
+* xref:resources/upload.adoc[Upload]
+* xref:resources/album.adoc[Album]
+
+Click on each respective resource for more details.
+
+[[media_server]]
+== Media server
+
+The media server (``spexgram-media``, nginx) serves Immich's thumbnails, previews, originals and videos on a hostname of its own (``API_MEDIA_BASE_URL``).
+It never asks the API: every address is signed and expires.
+Items in GraphQL come with ``Item.media``:
+
+[source]
+----
+<media base URL>/a/<assetId>/<variant>/<expires>/<signature>
+signature = base64url(md5("<expires><assetId>/<variant> <API_MEDIA_SIGNING_KEY>")), without padding
+----
+
+where the variant is ``thumbnail``, ``preview``, ``original`` or ``video``.
+Addresses are valid for at least four hours, until the next whole hour after that, so that a page loaded twice within the hour gets the same addresses.
+nginx's ``secure_link`` checks the signature: ``403 Forbidden`` for a wrong one, ``410 Gone`` when it has expired.
+It then asks Immich's matching endpoint (``/api/assets/<id>/thumbnail?size=thumbnail|preview``, ``/api/assets/<id>/original``, ``/api/assets/<id>/video/playback``) with a read-only API key, caches thumbnails and previews, and passes byte ranges for videos.
+``original`` is signed only for viewers who may download originals (``Limits.canDownloadOriginals``).
+The API and the media server share ``API_MEDIA_SIGNING_KEY``; its configuration is ``media/default.conf.template`` in https://github.com/bloomper/fgv-spexgram-deploy[fgv-spexgram-deploy].
+
+xref:index.adoc[Back to start page]
