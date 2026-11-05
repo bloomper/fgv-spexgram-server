@@ -26,8 +26,10 @@ type Query {
     thisDayInHistory(limit: Int = 30): [Item!]!
     "Anyone; SPEXIPEDIA also gets members' items. The albums of a spex and its revivals, oldest first."
     spexAlbums(spexId: ID!): [Album!]!
-    "Anyone; SPEXIPEDIA also gets members' items. The items among the ids the viewer may see, in the given order; at most 200."
+    "Anyone, for other applications: the public items among the ids, as visitors see them, in the given order; SPEXIPEDIA also gets members' items. At most 200."
     publicItems(ids: [ID!]!): [Item!]!
+    "Anyone. The items among the ids the viewer may see, in the given order, with fresh signed addresses: for renewing them on a page open for long. At most 200."
+    itemMedia(ids: [ID!]!): [Item!]!
     "Anyone. The album kinds, in order; the first is the default."
     albumKinds: [AlbumKind!]!
     "Anyone. The categories of the albums the viewer may see."
@@ -44,10 +46,10 @@ type Query {
     mapItems(filter: AlbumFilter): [MapItem!]!
     "USER. The caller's contributions, newest first: waiting for review, and accepted."
     myContributions: [Item!]!
-    "USER. The caller's album suggestions; every open one for EDITOR."
-    albumSuggestions(open: Boolean = true): [AlbumSuggestion!]!
-    "USER. The caller's reports; EDITOR: everyone's, open or handled."
-    reports(open: Boolean = true, mine: Boolean = false): [Report!]!
+    "USER. The caller's album suggestions; everyone's for EDITOR unless mine. Open ones, handled ones, or all when open is null; newest first, except everyone's open ones oldest first."
+    albumSuggestions(open: Boolean, mine: Boolean = false): [AlbumSuggestion!]!
+    "USER. The caller's reports; everyone's for EDITOR unless mine. Open ones, handled ones, or all when open is null; newest first, except everyone's open ones oldest first."
+    reports(open: Boolean, mine: Boolean = false): [Report!]!
     "EDITOR. Contributions waiting for review, oldest first, of one album or all."
     contributions(albumId: ID): [Item!]!
     "EDITOR. Items in Immich that belong to no album, grouped by the day they were taken."
@@ -255,7 +257,7 @@ type Album {
     items(page: Int = 0, size: Int = 100): ItemPage!
     "EDITOR. How many items outside the trash have each visibility of their own, e.g. to tell how many become public."
     visibilityCounts: [VisibilityCount!]!
-    "EDITOR. Whether a member suggested it and it waits for review."
+    "Anyone who may see the album (not sensitive): whether it is a member's suggestion that waits for an editor's review."
     suggested: Boolean!
     trashedAt: Instant
     createdAt: Instant!
@@ -544,6 +546,8 @@ type MapItem {
     longitude: Float!
     takenAt: String
     thumbnailUrl: String
+    "When thumbnailUrl stops working; ask again after that."
+    expiresAt: Instant
 }
 
 type UnsortedDay {

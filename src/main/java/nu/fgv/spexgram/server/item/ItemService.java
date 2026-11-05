@@ -148,15 +148,30 @@ public class ItemService {
     }
 
     /**
-     * The items among the ids the viewer may see, in the given order, for Spexipedia and other applications.
+     * The public items among the ids, as visitors see them, in the given order, for Spexipedia and other applications;
+     * Spexipedia's service account also gets members' items.
      */
     @Transactional(readOnly = true)
     public List<ItemDto> publicItems(final List<UUID> ids) {
+        final Viewer current = viewerService.currentForSpexipedia();
+
+        return itemsByIds(ids, current.kind() == Viewer.Kind.SPEXIPEDIA ? current : Viewer.visitor());
+    }
+
+    /**
+     * The items among the ids the viewer may see, in the given order, with fresh signed addresses: for a page that has
+     * been open longer than its addresses last.
+     */
+    @Transactional(readOnly = true)
+    public List<ItemDto> itemMedia(final List<UUID> ids) {
+        return itemsByIds(ids, viewerService.current());
+    }
+
+    private List<ItemDto> itemsByIds(final List<UUID> ids, final Viewer viewer) {
         if (ids.size() > MAX_IDS) {
             throw new BadRequestException("error.item.tooMany", MAX_IDS);
         }
 
-        final Viewer viewer = viewerService.currentForSpexipedia();
         final Map<UUID, Item> byId = repository.findByUuidIn(ids).stream().collect(Collectors.toMap(Item::getUuid, Function.identity()));
 
         return toDtos(ids.stream().distinct().map(byId::get).filter(Objects::nonNull)

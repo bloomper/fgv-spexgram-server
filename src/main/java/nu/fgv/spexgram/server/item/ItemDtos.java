@@ -83,7 +83,7 @@ public final class ItemDtos {
     }
 
     public record MapItem(UUID id, double latitude, double longitude, @Nullable String takenAt,
-                          @Nullable String thumbnailUrl) {
+                          @Nullable String thumbnailUrl, @Nullable Instant expiresAt) {
     }
 
     public enum ImmichJob {

@@ -124,6 +124,13 @@ class VisibilityIntegrationTest extends AbstractIntegrationTest {
                 .path("album").valueIsNull();
         graphQl(NO_ACCESS).document("{ albums { totalCount } }").execute()
                 .path("albums.totalCount").entity(Integer.class).isEqualTo(0);
+        // Renewing addresses gives what the viewer may see; publicItems only what is public
+        graphQl(VIEWER).document("query($ids: [ID!]!) { itemMedia(ids: $ids) { id media { previewUrl expiresAt } } }")
+                .variable("ids", items).execute()
+                .path("itemMedia[*].id").entityList(String.class).containsExactly(items.getFirst())
+                .path("itemMedia[0].media.previewUrl").entity(String.class).matches(url -> url.matches(MEDIA.formatted("preview")));
+        graphQl(VIEWER).document("query($ids: [ID!]!) { publicItems(ids: $ids) { id } }").variable("ids", items).execute()
+                .path("publicItems").entityList(Object.class).hasSize(0);
         graphQl(EDITOR)
                 .document("query($id: ID!) { albums { totalCount } album(id: $id) { itemCount visibilityCounts { visibility count } items { items { media { originalUrl } } } } }")
                 .variable("id", members)

@@ -71,6 +71,7 @@ Visitors never get an uploader, a position or an original; members get positions
 
 ``Item.media`` holds signed addresses on the media server for the thumbnail, the preview (about 1440 pixels, without metadata), the video and, for those allowed, the original, valid until ``expiresAt``.
 How they are signed is described under xref:api-guide.adoc#media_server[Media server].
+A page open longer than its addresses last asks ``itemMedia(ids)`` for fresh ones: the items among the ids the viewer may see, at most 200, without rendering anything else again.
 Ask for the items again when a page has been open longer.
 
 [[uploads]]
@@ -80,6 +81,9 @@ Files are uploaded with tus (see the xref:api-guide.adoc[HTTP API]) and given to
 Each upload gets an ``UploadResult``: ``CREATED`` with the new item, ``DUPLICATE`` with the item that already has the file (Immich recognises it by its checksum), or ``REJECTED`` with Immich's reason, e.g. a file that is not a photo or video.
 Items are ``PROCESSING`` until Immich has made their thumbnails and, for videos, transcoded them when needed; a job follows Immich every 20 seconds.
 A video longer than ``Settings.maxVideoMinutes`` is rejected then (``ItemFailure.TOO_LONG``) and its file deleted; it belongs in Spexflix.
+
+``albumSuggestions`` and ``reports`` list the caller's own, or everyone's for editors unless ``mine``; ``open`` picks open or handled ones, and without it they list all.
+``Album.suggested`` tells anyone who may see the album whether it is a member's suggestion still waiting for review.
 
 Members contribute to albums for members or the public, and to albums they suggested (``albumSuggest``), at most ``contributionMaxItems`` items and ``contributionMaxGb`` GB a day.
 Editors see ``contributions`` and review them with ``contributionsReview``: accepted ones become members' items, rejected ones are deleted from Immich at once.
@@ -97,12 +101,12 @@ Editors are emailed and handle reports with ``reportHandle``: ``REMOVED`` trashe
 
 ``search`` finds albums by title, place and description and items by caption and photographer, with MySQL's full-text indexes; every word must match as a prefix.
 ``smartSearch`` asks Immich's search by content (a multilingual CLIP model), leaves out what the viewer may not see and asks for more until the limit is reached.
-``mapItems`` lists items with a position for the map.
+``mapItems`` lists items with a position for the map, each with a signed thumbnail address and when it runs out (``expiresAt``).
 
 [[spexipedia]]
 == Spexipedia and other applications
 
-Other applications ask without a token which public albums belong to a spex (``spexAlbums``) and for signed addresses of public items (``publicItems``).
+Other applications ask without a token which public albums belong to a spex (``spexAlbums``) and for signed addresses of public items (``publicItems``, which answers as for a visitor whoever asks).
 Spexipedia's service account, with the ``SPEXIPEDIA`` role, also gets members' items; it shows them only to its logged-in users.
 Stable web addresses are ``/albums/<id>``, ``/items/<id>`` and ``/spex/<spexId>``.
 

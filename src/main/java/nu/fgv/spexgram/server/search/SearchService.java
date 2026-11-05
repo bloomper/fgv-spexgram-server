@@ -190,7 +190,8 @@ public class SearchService {
                 .stream()
                 .map(item -> new MapItem(item.getUuid(), Objects.requireNonNull(item.getLatitude()), Objects.requireNonNull(item.getLongitude()),
                         item.getTakenAt() == null ? null : item.getTakenAt().toString(),
-                        item.getImmichAssetId() == null ? null : signer.sign(item.getImmichAssetId(), MediaSigner.Variant.THUMBNAIL, expires)))
+                        item.getImmichAssetId() == null ? null : signer.sign(item.getImmichAssetId(), MediaSigner.Variant.THUMBNAIL, expires),
+                        item.getImmichAssetId() == null ? null : expires))
                 .toList();
     }
 

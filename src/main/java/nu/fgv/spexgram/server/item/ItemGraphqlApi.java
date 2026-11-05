@@ -76,6 +76,11 @@ public class ItemGraphqlApi {
     }
 
     @QueryMapping
+    public List<ItemDto> itemMedia(@Argument final List<UUID> ids) {
+        return service.itemMedia(ids);
+    }
+
+    @QueryMapping
     public List<UnsortedDay> unsorted() {
         return service.unsorted();
     }
