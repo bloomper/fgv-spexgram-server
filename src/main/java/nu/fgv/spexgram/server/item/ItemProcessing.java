@@ -57,7 +57,6 @@ public class ItemProcessing {
      * How long an asset Immich just got is left alone by the scans: its upload may not have made its item yet.
      */
     static final Duration SETTLE = Duration.ofMinutes(10);
-    static final String VIDEO_QUEUE = "videoConversion";
 
     private final ItemRepository repository;
     private final ImmichClient immichClient;
@@ -107,17 +106,9 @@ public class ItemProcessing {
             return;
         }
 
-        final boolean videoQueueIdle = videoQueueIdle();
-
         for (final Item item : processing) {
-            refresh(item.getId(), videoQueueIdle);
+            refreshOne(item.getId());
         }
-    }
-
-    private boolean videoQueueIdle() {
-        return immichClient.queues().stream()
-                .filter(queue -> VIDEO_QUEUE.equals(queue.name()))
-                .allMatch(queue -> queue.active() == 0 && queue.waiting() == 0);
     }
 
     /**
@@ -125,13 +116,13 @@ public class ItemProcessing {
      */
     public void refresh(final Long itemId) {
         try {
-            refresh(itemId, videoQueueIdle());
+            refreshOne(itemId);
         } catch (final ImmichUnavailableException e) {
             log.debug("Could not check item {} in Immich", itemId, e);
         }
     }
 
-    private void refresh(final Long itemId, final boolean videoQueueIdle) {
+    private void refreshOne(final Long itemId) {
         final Item snapshot = repository.findById(itemId).filter(item -> item.getStatus() == ItemStatus.PROCESSING).orElse(null);
 
         if (snapshot == null || snapshot.getImmichAssetId() == null) {
@@ -140,9 +131,13 @@ public class ItemProcessing {
 
         final UUID assetId = snapshot.getImmichAssetId();
         final Optional<ImmichClient.Asset> asset = immichClient.asset(assetId);
-        // A video is ready once transcoded, or once Immich's transcoding has nothing left to do: it needed none
+        // A video is ready only once transcoded: Immich transcodes every one, and the browser version carries none of
+        // the original's metadata (location, creation time), which viewers who may not download originals must not get
+        final boolean transcoded = asset.filter(found -> found.video() && found.hasThumbnail())
+                .map(_ -> immichClient.isEncoded(assetId))
+                .orElse(false);
         final boolean ready = asset.filter(ImmichClient.Asset::hasThumbnail)
-                .map(found -> !found.video() || videoQueueIdle || immichClient.isEncoded(assetId))
+                .map(found -> !found.video() || transcoded)
                 .orElse(false);
         final long maxVideoMs = Duration.ofMinutes(settingsService.current().getMaxVideoMinutes()).toMillis();
 
@@ -158,6 +153,7 @@ public class ItemProcessing {
                     return;
                 }
                 copy(asset.get(), item);
+                item.setTranscoded(transcoded);
                 if (asset.get().video() && item.getDurationMs() != null && item.getDurationMs() > maxVideoMs) {
                     immichClient.delete(List.of(assetId));
                     item.setImmichAssetId(null);
@@ -214,7 +210,8 @@ public class ItemProcessing {
                 item.setStatus(ItemStatus.PROCESSING);
                 item.setProcessingSince(clock.instant());
                 copy(asset, item);
-                if (asset.hasThumbnail()) {
+                // A video waits for its browser version, which the processing poll follows
+                if (asset.hasThumbnail() && !asset.video()) {
                     item.setStatus(ItemStatus.READY);
                     item.setProcessingSince(null);
                 }

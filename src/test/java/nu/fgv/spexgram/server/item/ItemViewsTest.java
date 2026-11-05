@@ -168,4 +168,19 @@ class ItemViewsTest {
         assertThat(ItemViews.canSee(album, MEMBER)).isTrue();
         assertThat(ItemViews.canSee(album, VISITOR)).isFalse();
     }
+
+    @Test
+    void aVideoIsPlayedOnlyFromItsTranscodedVersionUnlessTheViewerMayDownloadOriginals() {
+        final Item video = item(album(Visibility.PUBLIC), Visibility.PUBLIC);
+
+        video.setType(ItemType.VIDEO);
+        assertThat(views.toDto(video, VISITOR).media().videoUrl()).isNull();
+        assertThat(views.toDto(video, MEMBER).media().videoUrl()).isNull();
+        assertThat(views.toDto(video, EDITOR).media().videoUrl()).contains("/video/");
+
+        video.setTranscoded(true);
+        assertThat(views.toDto(video, VISITOR).media().videoUrl()).contains("/video/");
+        assertThat(views.toDto(video, VISITOR).media().originalUrl()).isNull();
+        assertThat(views.toDto(video, SPEXIPEDIA).media().videoUrl()).isNull();
+    }
 }

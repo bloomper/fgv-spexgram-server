@@ -18,9 +18,13 @@
 package nu.fgv.spexgram.server.item;
 
 import nu.fgv.spexgram.server.AbstractIntegrationTest;
+import nu.fgv.spexgram.server.immich.ImmichClient;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
 
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,6 +46,8 @@ class UploadIntegrationTest extends AbstractIntegrationTest {
             mutation($album: ID!, $uploads: [String!]!) {
                 itemsAdd(albumId: $album, uploadIds: $uploads) { outcome message existingAlbumTitle item { id status } existingItem { id } }
             }""";
+
+    private static final String LOCATION = "+57.6890+011.9740/";
 
     @TempDir
     private Path folder;
@@ -79,6 +85,72 @@ class UploadIntegrationTest extends AbstractIntegrationTest {
                 .path("itemsAdd[0].existingItem.id").entity(String.class).isEqualTo(first)
                 .path("itemsAdd[0].existingAlbumTitle").entity(String.class).isEqualTo("Cleopatra 2024 – föreställning");
         assertThat(jdbcClient.sql("SELECT COUNT(*) FROM item").query(Long.class).single()).isEqualTo(1);
+    }
+
+    @Test
+    void aDuplicateOfAnItemInAnAlbumTheContributorMayNotSeeDoesNotNameIt() throws Exception {
+        final String hidden = createAlbum("UNPUBLISHED");
+        final Path photo = photo(folder, "hemlig.jpg");
+
+        graphQl(EDITOR).document(ADD).variables(Map.of("album", hidden, "uploads", List.of(upload(EDITOR, photo))))
+                .execute().path("itemsAdd[0].outcome").entity(String.class).isEqualTo("CREATED");
+        graphQl(VIEWER)
+                .document("mutation($album: ID!, $uploads: [String!]!) { contributionsAdd(albumId: $album, uploadIds: $uploads) { outcome existingAlbumTitle existingItem { id } } }")
+                .variables(Map.of("album", createAlbum("MEMBERS"), "uploads", List.of(upload(VIEWER, photo))))
+                .execute()
+                .path("contributionsAdd[0].outcome").entity(String.class).isEqualTo("DUPLICATE")
+                .path("contributionsAdd[0].existingAlbumTitle").valueIsNull()
+                .path("contributionsAdd[0].existingItem").valueIsNull();
+    }
+
+    @Test
+    void aVideoIsPlayedFromItsTranscodedVersionWithoutTheOriginalsLocation() throws Exception {
+        final String album = createAlbum("MEMBERS");
+        final Path video = folder.resolve("med-plats.mp4");
+        final Process ffmpeg = new ProcessBuilder("ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "lavfi", "-i", "testsrc=size=320x240:rate=25:duration=3",
+                "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=22050:duration=3", "-shortest",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+                "-metadata", "location=" + LOCATION, "-metadata", "creation_time=2024-02-14T20:00:00Z",
+                video.toString()).redirectErrorStream(true).start();
+
+        assertThat(ffmpeg.waitFor()).as(new String(ffmpeg.getInputStream().readAllBytes(), StandardCharsets.UTF_8)).isZero();
+        assertThat(tags(video)).as("the original's metadata").contains("location=" + LOCATION, "creation_time=2024-02-14");
+
+        final String id = graphQl(EDITOR).document(ADD).variables(Map.of("album", album, "uploads", List.of(upload(EDITOR, video))))
+                .execute()
+                .path("itemsAdd[0].item.id").entity(String.class).get();
+
+        awaitReady(List.of(id));
+        graphQl(VIEWER).document("query($id: ID!) { item(id: $id) { type media { videoUrl originalUrl } } }").variable("id", id).execute()
+                .path("item.type").entity(String.class).isEqualTo("VIDEO")
+                .path("item.media.videoUrl").entity(String.class).matches(url -> url.contains("/video/"))
+                .path("item.media.originalUrl").valueIsNull();
+
+        // What the media server serves for "video": Immich's playback endpoint, with the media server's read-only key
+        final String asset = jdbcClient.sql("SELECT immich_asset_id FROM item WHERE uuid = :id").param("id", id).query(String.class).single();
+        final byte[] played = RestClient.builder().baseUrl(immichUrl())
+                .requestFactory(new JdkClientHttpRequestFactory(HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()))
+                .build().get().uri("/api/assets/{id}/video/playback", asset)
+                .header(ImmichClient.API_KEY_HEADER, Files.readString(DATA.resolve("immich-keys/media.key")))
+                .retrieve().body(byte[].class);
+
+        final Path playedFile = folder.resolve("spelad.mp4");
+
+        Files.write(playedFile, played);
+        assertThat(tags(playedFile)).as("the played video's metadata").doesNotContain("location", "2024-02-14");
+    }
+
+    /**
+     * The container's metadata as ffprobe reads it, one key=value per line.
+     */
+    private static String tags(final Path file) throws Exception {
+        final Process ffprobe = new ProcessBuilder("ffprobe", "-v", "error", "-show_entries", "format_tags", "-of", "default=noprint_wrappers=1",
+                file.toString()).redirectErrorStream(true).start();
+        final String output = new String(ffprobe.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+
+        assertThat(ffprobe.waitFor()).as(output).isZero();
+        return output.replace("TAG:", "");
     }
 
     @Test

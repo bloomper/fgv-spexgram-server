@@ -157,7 +157,9 @@ public class ItemViews {
 
         final Instant expires = context.expires();
         final boolean video = item.getType() == ItemType.VIDEO;
-        final boolean playable = context.viewer().kind() != Viewer.Kind.SPEXIPEDIA;
+        // Immich plays the original when it has no browser version; that, with its location, only for those who may
+        // download originals
+        final boolean playable = context.viewer().kind() != Viewer.Kind.SPEXIPEDIA && (item.isTranscoded() || context.originals());
 
         return new MediaDto(signer.sign(asset, MediaSigner.Variant.THUMBNAIL, expires),
                 signer.sign(asset, MediaSigner.Variant.PREVIEW, expires),

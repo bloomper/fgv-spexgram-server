@@ -136,6 +136,12 @@ public class Item extends AbstractAuditable {
     private @Nullable String uploadedByName;
 
     /**
+     * Whether Immich has made the video's browser version, which carries no location or other metadata of the original.
+     */
+    @Column(name = "transcoded", nullable = false)
+    private boolean transcoded;
+
+    /**
      * When Immich got the file, to give up on processing that never finishes.
      */
     @Column(name = "processing_since")

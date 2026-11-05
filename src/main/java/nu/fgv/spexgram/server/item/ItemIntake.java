@@ -117,10 +117,12 @@ public class ItemIntake {
             if (existing.isPresent() && !(viewer.isEditor() && existing.get().getAlbum() == null)) {
                 final Item item = existing.get();
                 final boolean visible = ItemViews.canSee(item, viewer);
+                // An album the caller may not see is not named: the answer is only that the file is already here
+                final boolean albumVisible = item.getAlbum() != null && ItemViews.canSee(item.getAlbum(), viewer);
 
                 return new UploadResult(upload.id(), upload.fileName(), UploadOutcome.DUPLICATE, null,
                         visible ? views.toDto(item, viewer) : null,
-                        item.getAlbum() == null ? null : item.getAlbum().getTitle(), null);
+                        albumVisible ? item.getAlbum().getTitle() : null, null);
             }
 
             // An unsorted item an editor uploads again is sorted into the album; else a new item
@@ -128,6 +130,7 @@ public class ItemIntake {
 
             item.setAlbum(album);
             item.setImmichAssetId(sent.id());
+            item.setTranscoded(false);
             item.setOriginalFileName(upload.fileName());
             item.setFileSize(upload.length());
             item.setStatus(ItemStatus.PROCESSING);
@@ -189,6 +192,7 @@ public class ItemIntake {
             final Item item = repository.findById(current.getId()).orElseThrow();
 
             item.setImmichAssetId(sent.id());
+            item.setTranscoded(false);
             item.setOriginalFileName(upload.fileName());
             item.setFileSize(upload.length());
             item.setStatus(ItemStatus.PROCESSING);

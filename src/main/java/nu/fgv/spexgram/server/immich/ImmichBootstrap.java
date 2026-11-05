@@ -164,9 +164,12 @@ public class ImmichBootstrap {
         // Spexgram has a trash of its own; what it deletes in Immich is gone
         set(wanted, "trash", "enabled", false);
         set(wanted, "oauth", "enabled", false);
+        // Every video gets a browser version, which Immich makes with -map_metadata -1: viewers who may not download
+        // originals are played that, never the original with its location and creation time
+        set(wanted, "ffmpeg", "transcode", "all");
         if (!wanted.equals(current)) {
             client.updateSystemConfig(token, wanted);
-            log.info("Configured Immich: no storage template, face recognition or trash; search by content with {}", properties.clipModel());
+            log.info("Configured Immich: no storage template, face recognition or trash; every video transcoded; search by content with {}", properties.clipModel());
         }
     }
 
