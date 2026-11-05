@@ -1,0 +1,167 @@
+spring:
+  config:
+    import: "optional:configtree:/run/secrets/"
+  datasource:
+    password: ${MYSQL_API_USER_PASSWORD:}
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        type:
+          preferred_uuid_jdbc_type: CHAR
+        # Loads the collections of many albums in one query, not one per album
+        default_batch_fetch_size: 100
+        transaction:
+          jta:
+            platform: org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform
+  mail:
+    password: ${SMTP_PASSWORD:}
+  messages:
+    basename: messages
+    fallback-to-system-locale: false
+    encoding: UTF-8
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${spexgram.keycloak.url}/realms/${spexgram.keycloak.realm}
+      client:
+        registration:
+          fgv-spexgram-service:
+            provider: fgv
+            client-id: ${spexgram.keycloak.service-client-id}
+            client-secret: ${spexgram.keycloak.service-client-secret}
+            authorization-grant-type: client_credentials
+        provider:
+          fgv:
+            token-uri: ${spexgram.keycloak.url}/realms/${spexgram.keycloak.realm}/protocol/openid-connect/token
+  threads:
+    virtual:
+      enabled: true
+  web:
+    locale: sv
+  graphql:
+    schema:
+      printer:
+        enabled: true
+      introspection:
+        enabled: false
+    http:
+      path: /api/graphql
+
+management:
+  server:
+    port: 9000
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,info
+  health:
+    # Mail is only for notifications; the API is healthy without it
+    mail:
+      enabled: false
+
+server:
+  port: 8080
+  forward-headers-strategy: framework
+  tomcat:
+    # tus chunks are at most 50 MB
+    max-swallow-size: 60MB
+
+logging:
+  file:
+    path: ./data/log_data
+
+spexgram:
+  time-zone: Europe/Stockholm
+  web-url: ${API_WEB_URL:http://localhost:3004}
+  jobs:
+    spex-refresh:
+      cron-expression: 0 15 3 * * * # Every day at 03:15
+    unsorted-scan:
+      cron-expression: 0 */5 * * * * # Every five minutes
+    processing-poll:
+      cron-expression: "*/20 * * * * *" # Every 20 seconds
+    item-check:
+      cron-expression: 0 45 3 * * * # Every day at 03:45
+    upload-cleanup:
+      cron-expression: 0 5 * * * * # Every hour at :05
+    retention:
+      cron-expression: 0 30 4 * * * # Every day at 04:30
+    contribution-mail:
+      cron-expression: 0 0 18 * * * # Every day at 18:00
+  keycloak:
+    url: ${API_KEYCLOAK_URL:https://auth.fgv.local.nu:8443/auth}
+    realm: ${API_KEYCLOAK_REALM:fgv}
+    service-client-id: ${API_KEYCLOAK_SERVICE_CLIENT_ID:fgv-spexgram-service}
+    service-client-secret: ${API_KEYCLOAK_SERVICE_CLIENT_SECRET:}
+    # Only for the sample data import, which grants roles
+    admin-client-id: ${API_KEYCLOAK_ADMIN_CLIENT_ID:fgv-admin}
+    admin-client-secret: ${API_KEYCLOAK_ADMIN_CLIENT_SECRET:}
+  security:
+    authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexgram,fgv-spexipedia-service}
+  media:
+    # The DNS-only media hostname served by spexgram-media (nginx)
+    base-url: ${API_MEDIA_BASE_URL:https://media.spexgram.fgv.local.nu:8443}
+    # Shared with spexgram-media, which checks the signed addresses
+    signing-key: ${API_MEDIA_SIGNING_KEY:}
+    link-validity: 4h
+    uploads: ${API_UPLOADS_ROOT:./data/uploads}
+    max-upload-size: ${API_MAX_UPLOAD_SIZE:4GB}
+  immich:
+    url: ${API_IMMICH_URL:http://localhost:2283}
+    admin-email: ${API_IMMICH_ADMIN_EMAIL:spexgram@fgv.nu}
+    admin-password: ${API_IMMICH_ADMIN_PASSWORD:}
+    # The media server mounts this folder read-only for its key
+    keys-dir: ${API_IMMICH_KEYS_DIR:./data/immich-keys}
+    # Multilingual, and understands Swedish and English queries without being told the language
+    clip-model: ${API_IMMICH_CLIP_MODEL:ViT-L-16-SigLIP2-256__webli}
+    startup-wait: 2m
+  turnstile:
+    secret-key: ${API_TURNSTILE_SECRET_KEY:}
+    verify-url: https://challenges.cloudflare.com/turnstile/v0/siteverify
+  mail:
+    from: ${MAIL_FROM:noreply@localhost}
+  spexregister:
+    graphql-url: ${API_SPEXREGISTER_GRAPHQL_URL:https://api.register.fgv.local.nu:8443/api/graphql}
+  data:
+    import-sample-data: ${API_IMPORT_SAMPLE_DATA:false}
+    sample-data-size: ${API_SAMPLE_DATA_SIZE:small}
+    sample-user-password: ${SAMPLE_USER_PASSWORD:s3cr3t-s3cr3t}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  graphql:
+    schema:
+      introspection:
+        enabled: true
+  # The password comes from MYSQL_API_USER_PASSWORD, as in the container
+  datasource:
+    url: jdbc:mysql://localhost:3310/spexgram
+    username: spexgram
+  mail:
+    host: localhost
+    port: 1025
+
+server:
+  port: 8085
+
+management:
+  server:
+    port: 9005
+
+spexgram:
+  keycloak:
+    url: https://auth.fgv.local.nu:8443/auth
+  media:
+    base-url: http://localhost:8086
+    # A key for development only; every other environment sets API_MEDIA_SIGNING_KEY
+    signing-key: ${API_MEDIA_SIGNING_KEY:spexgram-development-signing-key}
+  immich:
+    admin-password: ${API_IMMICH_ADMIN_PASSWORD:spexgram-development-immich-password}
+  turnstile:
+    # Cloudflare's documented test secret, which accepts every token
+    secret-key: ${API_TURNSTILE_SECRET_KEY:1x0000000000000000000000000000000AA}

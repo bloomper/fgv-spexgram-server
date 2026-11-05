@@ -1,0 +1,10 @@
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+    <logger name="org.testcontainers" level="WARN"/>
+    <logger name="tc" level="WARN"/>
+    <logger name="com.github.dockerjava" level="WARN"/>
+    <logger name="org.wiremock" level="WARN"/>
+    <logger name="WireMock" level="WARN"/>
+    <logger name="org.hibernate.envers" level="WARN"/>
+    <root level="INFO"/>
+</configuration>
