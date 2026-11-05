@@ -31,7 +31,7 @@ import java.time.LocalDate;
 
 /**
  * How much a member may contribute per day (5.4): at most {@code contributionMaxItems} items and
- * {@code contributionMaxGb} GB, counted from midnight, uploads in progress included.
+ * {@code contributionMaxGb} GB, counted from midnight, with every upload in progress counted at its declared length.
  *
  * @author Anders Jacobsson
  * @since 1.0
@@ -65,7 +65,7 @@ public class ContributionQuota {
     public void requireBytes(final String subject, final long bytes) {
         final Settings settings = settingsService.current();
         final Instant today = today();
-        final long used = itemRepository.sumContributionBytesSince(subject, today) + uploadRepository.sumLengthByOwnerSince(subject, today);
+        final long used = itemRepository.sumContributionBytesSince(subject, today) + uploadRepository.sumLengthByOwner(subject);
 
         if (used + bytes > settings.getContributionMaxGb() * GB) {
             throw new BadRequestException("error.contribution.limitBytes", settings.getContributionMaxGb());

@@ -22,16 +22,43 @@ import nu.fgv.spexgram.server.util.graphql.CustomScalars;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.graphql.execution.RuntimeWiringConfigurer;
+import org.springframework.graphql.server.WebGraphQlInterceptor;
+import org.springframework.util.StringUtils;
+
+import java.net.InetSocketAddress;
+import java.util.Map;
 
 
 /**
- * Scalars and query limits.
+ * Scalars, query limits, and the client's address in the GraphQL context.
  *
  * @author Anders Jacobsson
  * @since 1.0
  */
 @Configuration
 public class GraphqlConfig {
+
+    /**
+     * The GraphQL context's key for the visitor's address: the web passes it in {@value #CLIENT_IP_HEADER} (from
+     * Cloudflare's or the proxy's header), else the caller's own address is used. Only used to limit visitors' reports.
+     */
+    public static final String CLIENT_IP = "clientIp";
+    public static final String CLIENT_IP_HEADER = "X-Client-IP";
+
+    @Bean
+    public WebGraphQlInterceptor clientIpInterceptor() {
+        return (request, chain) -> {
+            final String header = request.getHeaders().getFirst(CLIENT_IP_HEADER);
+            final InetSocketAddress remote = request.getRemoteAddress();
+            final String ip = StringUtils.hasText(header) ? header.strip()
+                    : remote == null ? null : remote.getHostString();
+
+            if (ip != null) {
+                request.configureExecutionInput((input, builder) -> builder.graphQLContext(Map.of(CLIENT_IP, ip)).build());
+            }
+            return chain.next(request);
+        };
+    }
 
     @Bean
     public RuntimeWiringConfigurer runtimeWiringConfigurer() {

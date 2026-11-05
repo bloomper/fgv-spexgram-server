@@ -33,6 +33,12 @@ public interface UploadSessionRepository extends JpaRepository<UploadSession, St
 
     List<UploadSession> findByCreatedAtBefore(Instant before);
 
-    @Query("SELECT COALESCE(SUM(s.length), 0) FROM UploadSession s WHERE s.owner = :owner AND s.createdAt >= :since")
-    long sumLengthByOwnerSince(@Param("owner") String owner, @Param("since") Instant since);
+    /**
+     * The declared length of the owner's open uploads, whenever they were started: they are deleted once used or after
+     * 24 hours.
+     */
+    @Query("SELECT COALESCE(SUM(s.length), 0) FROM UploadSession s WHERE s.owner = :owner")
+    long sumLengthByOwner(@Param("owner") String owner);
+
+    long countByOwner(String owner);
 }

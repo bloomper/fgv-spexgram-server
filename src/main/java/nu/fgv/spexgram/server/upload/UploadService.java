@@ -61,6 +61,8 @@ public class UploadService {
     public static final long MAX_CHUNK = 60L * 1024 * 1024;
     private static final Duration KEEP = Duration.ofHours(24);
     private static final int MAX_FILE_NAME = 255;
+    /** Open uploads a member may hold at once; editors are not limited. */
+    static final int MAX_OPEN_PER_MEMBER = 10;
 
     private final UploadSessionRepository repository;
     private final Path folder;
@@ -99,6 +101,10 @@ public class UploadService {
             throw new BadRequestException("error.upload.tooLarge");
         }
         if (!caller.isEditor()) {
+            // A member cannot hold more than a few uploads open, each counted against the day's quota at its length
+            if (repository.countByOwner(caller.subject()) >= MAX_OPEN_PER_MEMBER) {
+                throw new BadRequestException("error.upload.tooMany", MAX_OPEN_PER_MEMBER);
+            }
             contributionQuota.requireBytes(caller.subject(), length);
         }
 
