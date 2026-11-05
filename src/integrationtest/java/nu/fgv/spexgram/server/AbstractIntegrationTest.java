@@ -25,6 +25,7 @@ import dasniko.testcontainers.keycloak.KeycloakContainer;
 import jakarta.ws.rs.core.Response;
 import nu.fgv.spexgram.server.immich.ImmichClient;
 import nu.fgv.spexgram.server.item.ItemProcessing;
+import nu.fgv.spexgram.server.report.VisitorReportLimiter;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.keycloak.admin.client.Keycloak;
@@ -157,6 +158,8 @@ public abstract class AbstractIntegrationTest {
     protected ImmichClient immichClient;
     @Autowired
     protected ItemProcessing processing;
+    @Autowired
+    private VisitorReportLimiter reportLimiter;
 
     @DynamicPropertySource
     static void properties(final DynamicPropertyRegistry registry) {
@@ -328,7 +331,10 @@ public abstract class AbstractIntegrationTest {
                         {"data": {"spex": {"id": "00000000-0000-7000-8000-000000000001", "year": "2024", "title": "Cleopatra", "revival": false, "parent": null,
                                            "category": {"id": "00000000-0000-7000-8000-000000000002", "name": "Chalmersspexet"}}}}""")));
         WIREMOCK.stubFor(post(urlEqualTo("/turnstile/v0/siteverify"))
-                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("{\"success\": true}")));
+                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("{\"success\": true, \"hostname\": \"spexgram.test\"}")));
+        WIREMOCK.stubFor(post(urlEqualTo("/turnstile/v0/siteverify"))
+                .withRequestBody(containing("response=elsewhere"))
+                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("{\"success\": true, \"hostname\": \"evil.example\"}")));
         WIREMOCK.stubFor(post(urlEqualTo("/turnstile/v0/siteverify"))
                 .withRequestBody(containing("response=bad"))
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("{\"success\": false}")));
@@ -336,6 +342,7 @@ public abstract class AbstractIntegrationTest {
 
     @BeforeEach
     void resetState() throws Exception {
+        reportLimiter.clear();
         jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 0").update();
         for (final String table : List.of("audit_entry", "report", "contribution_review", "album_suggestion", "album_spex", "item",
                 "album", "upload_session", "app_user")) {
@@ -431,10 +438,10 @@ public abstract class AbstractIntegrationTest {
                 .path("albumCreate.id").entity(String.class).get();
 
         graphQl(EDITOR)
-                .document("mutation($id: ID!, $v: Visibility!) { albumSetVisibility(id: $id, visibility: $v) { visibility } }")
+                .document("mutation($id: ID!, $v: Visibility!) { albumSetVisibility(id: $id, visibility: $v) { album { visibility } } }")
                 .variables(Map.of("id", id, "v", visibility))
                 .execute()
-                .path("albumSetVisibility.visibility").entity(String.class).isEqualTo(visibility);
+                .path("albumSetVisibility.album.visibility").entity(String.class).isEqualTo(visibility);
         return id;
     }
 

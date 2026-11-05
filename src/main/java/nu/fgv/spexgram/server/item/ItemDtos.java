@@ -57,6 +57,12 @@ public final class ItemDtos {
                            @Nullable String originalUrl, Instant expiresAt) {
     }
 
+    /**
+     * @param skipped how many items kept their visibility because an open report hides them
+     */
+    public record ItemsUpdateResult(List<ItemDto> items, int skipped) {
+    }
+
     public record ItemPage(List<ItemDto> items, long totalCount, int page, int size) {
     }
 

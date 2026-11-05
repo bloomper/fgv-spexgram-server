@@ -43,7 +43,7 @@ class VisibilityIntegrationTest extends AbstractIntegrationTest {
 
     private void setItemVisibility(final String itemId, final String visibility) {
         graphQl(EDITOR)
-                .document("mutation($ids: [ID!]!, $v: Visibility) { itemsUpdate(ids: $ids, input: {visibility: $v}) { visibility } }")
+                .document("mutation($ids: [ID!]!, $v: Visibility) { itemsUpdate(ids: $ids, input: {visibility: $v}) { items { visibility } } }")
                 .variables(Map.of("ids", List.of(itemId), "v", visibility))
                 .execute()
                 .errors().verify();

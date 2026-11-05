@@ -79,13 +79,16 @@ public class ReportService {
     private final UserDirectory directory;
     private final Mailer mailer;
     private final TransactionTemplate transactionTemplate;
+    private final VisitorReportLimiter limiter;
     private final Clock clock;
 
     @SuppressWarnings("java:S107")
     public ReportService(final ReportRepository repository, final ItemRepository itemRepository,
                          final ViewerService viewerService, final TurnstileVerifier turnstile,
                          final AuditService auditService, final UserDirectory directory, final Mailer mailer,
-                         final TransactionTemplate transactionTemplate, final Clock clock) {
+                         final TransactionTemplate transactionTemplate, final VisitorReportLimiter limiter,
+                         final Clock clock) {
+        this.limiter = limiter;
         this.repository = repository;
         this.itemRepository = itemRepository;
         this.viewerService = viewerService;
@@ -141,7 +144,7 @@ public class ReportService {
     /**
      * Reports an item the viewer may see.
      */
-    public ReportDto create(final ReportInput input, final @Nullable Locale locale) {
+    public ReportDto create(final ReportInput input, final @Nullable Locale locale, final @Nullable String clientIp) {
         final Viewer viewer = viewerService.current();
         final boolean visitor = !viewer.isMember();
         final String email = input.email() == null ? null : input.email().strip();
@@ -149,6 +152,9 @@ public class ReportService {
         if (visitor) {
             if (email == null || email.length() > MAX_EMAIL || !EMAIL.matcher(email).matches()) {
                 throw new BadRequestException("error.report.email");
+            }
+            if (!limiter.tryAcquire(clientIp, email)) {
+                throw new BadRequestException("error.report.tooMany");
             }
             if (input.turnstileToken() == null || !turnstile.verify(input.turnstileToken())) {
                 throw new BadRequestException("error.report.turnstile");
@@ -254,18 +260,34 @@ public class ReportService {
     }
 
     /**
-     * Gives the item back the visibility the report took from it, unless other open reports still hide it; then the
-     * earliest of those, which hid it last, learns what it was before this one.
+     * Gives the item back the visibility the report took from it, unless other open reports still hide it.
      */
     private void showAgain(final Report report, final Item item) {
-        final Optional<Report> earliestOther = repository.findByItemAndStatus(item, Report.Status.OPEN).stream()
+        showAgain(report, item, repository.findByItemAndStatus(item, Report.Status.OPEN).stream()
                 .filter(other -> !other.getId().equals(report.getId()) && other.getHiddenFrom() != null)
-                .min(Comparator.comparing(Report::getCreatedAt));
+                .toList());
+    }
 
-        if (earliestOther.isEmpty()) {
-            item.setVisibility(Objects.requireNonNull(report.getHiddenFrom()));
-        } else if (report.getCreatedAt().isBefore(earliestOther.get().getCreatedAt())) {
+    /**
+     * The visibility a report gave the item when it hid it: a visitor's makes it a members' item, a member's
+     * unpublished.
+     */
+    static Visibility hiddenAs(final Report report) {
+        return report.getVisitorEmail() != null ? Visibility.MEMBERS : Visibility.UNPUBLISHED;
+    }
+
+    /**
+     * When the earliest of the other hiding reports came after this one, it hid an item this one had hidden, so it learns
+     * what the item was before this one. Else this one hid last, and the item gets back what it had before, but only if
+     * it still has what the report gave it: an editor who has changed it meanwhile decided otherwise.
+     */
+    static void showAgain(final Report report, final Item item, final List<Report> otherOpenHiding) {
+        final Optional<Report> earliestOther = otherOpenHiding.stream().min(Comparator.comparing(Report::getCreatedAt));
+
+        if (earliestOther.isPresent() && report.getCreatedAt().isBefore(earliestOther.get().getCreatedAt())) {
             earliestOther.get().setHiddenFrom(report.getHiddenFrom());
+        } else if (item.getVisibility() == hiddenAs(report)) {
+            item.setVisibility(Objects.requireNonNull(report.getHiddenFrom()));
         }
     }
 

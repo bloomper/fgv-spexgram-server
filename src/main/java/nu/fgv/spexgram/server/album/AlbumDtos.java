@@ -81,4 +81,10 @@ public final class AlbumDtos {
 
     public record VisibilityCount(Visibility visibility, int count) {
     }
+
+    /**
+     * @param skipped how many items kept their visibility because an open report hides them
+     */
+    public record AlbumVisibilityResult(AlbumDto album, int skipped) {
+    }
 }

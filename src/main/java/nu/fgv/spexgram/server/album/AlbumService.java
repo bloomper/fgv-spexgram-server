@@ -25,6 +25,7 @@ import nu.fgv.spexgram.server.album.AlbumDtos.AlbumFilter;
 import nu.fgv.spexgram.server.album.AlbumDtos.AlbumInput;
 import nu.fgv.spexgram.server.album.AlbumDtos.AlbumPage;
 import nu.fgv.spexgram.server.album.AlbumDtos.AlbumSpexDto;
+import nu.fgv.spexgram.server.album.AlbumDtos.AlbumVisibilityResult;
 import nu.fgv.spexgram.server.album.AlbumDtos.CategoryDto;
 import nu.fgv.spexgram.server.audit.AuditService;
 import nu.fgv.spexgram.server.immich.ImmichClient;
@@ -386,9 +387,14 @@ public class AlbumService {
         return (spex.getYear() == null ? title : title + " " + spex.getYear()) + " – " + kind.getNameSv().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * Sets the album's visibility and, with items, its items'; items an open report hides keep theirs until it is
+     * handled, and are counted as skipped.
+     */
     @Transactional
-    public AlbumDto setVisibility(final UUID id, final Visibility visibility, final boolean items) {
+    public AlbumVisibilityResult setVisibility(final UUID id, final Visibility visibility, final boolean items) {
         final Album album = editable(id);
+        int skipped = 0;
 
         album.setVisibility(visibility);
         if (visibility != Visibility.UNPUBLISHED) {
@@ -396,13 +402,22 @@ public class AlbumService {
             album.setSuggestedBy(null);
         }
         if (items) {
-            itemRepository.findByAlbumAndTrashedAtIsNull(album).stream()
+            final List<Item> changed = itemRepository.findByAlbumAndTrashedAtIsNull(album).stream()
                     .filter(item -> item.getContributionStatus() != ContributionStatus.WAITING)
-                    .forEach(item -> item.setVisibility(visibility));
+                    .toList();
+            final Set<Long> hidden = changed.isEmpty() ? Set.of() : itemRepository.findHiddenByOpenReports(changed);
+
+            for (final Item item : changed) {
+                if (hidden.contains(item.getId())) {
+                    skipped++;
+                } else {
+                    item.setVisibility(visibility);
+                }
+            }
         }
         auditService.record("VISIBILITY", "ALBUM", album.getUuid(), "Gjorde albumet %s %s%s".formatted(album.getTitle(),
                 describe(visibility), items ? ", med alla bilder och filmer" : ""));
-        return toDto(album);
+        return new AlbumVisibilityResult(toDto(album), skipped);
     }
 
     public static String describe(final Visibility visibility) {

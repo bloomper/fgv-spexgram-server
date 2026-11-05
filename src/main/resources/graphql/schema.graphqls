@@ -73,8 +73,8 @@ type Mutation {
     albumCreate(input: AlbumInput!): Album!
     "EDITOR."
     albumUpdate(id: ID!, input: AlbumInput!): Album!
-    "EDITOR. With items, also sets every item of the album outside the trash and review to the same visibility."
-    albumSetVisibility(id: ID!, visibility: Visibility!, items: Boolean = false): Album!
+    "EDITOR. With items, also sets every item of the album outside the trash and review to the same visibility, except those an open report hides (skipped)."
+    albumSetVisibility(id: ID!, visibility: Visibility!, items: Boolean = false): AlbumVisibilityResult!
     "EDITOR. One of the album's items; null for the first."
     albumSetCover(id: ID!, itemId: ID): Album!
     "EDITOR. Its items go with it."
@@ -89,8 +89,8 @@ type Mutation {
     itemReplaceFile(id: ID!, uploadId: String!): Item!
     "EDITOR. Replaces the item's caption, photographer, date taken and position."
     itemUpdate(id: ID!, input: ItemInput!): Item!
-    "EDITOR. Changes what is given for every item; unsorted items are sorted by giving an album."
-    itemsUpdate(ids: [ID!]!, input: ItemsInput!): [Item!]!
+    "EDITOR. Changes what is given for every item; unsorted items are sorted by giving an album, and an item moved away stops being its old album's cover. Items an open report hides keep their visibility (skipped)."
+    itemsUpdate(ids: [ID!]!, input: ItemsInput!): ItemsUpdateResult!
     "EDITOR."
     itemsTrash(ids: [ID!]!): [Item!]!
     "EDITOR. Items of a trashed album go back to it once it is restored."
@@ -113,7 +113,7 @@ type Mutation {
     albumSuggestionReview(id: ID!, accept: Boolean!, message: String): AlbumSuggestion!
     "Anyone who may see the item. Visitors give an email address and a Turnstile token. I_AM_IN_IT hides the item at once until it is handled."
     reportCreate(input: ReportInput!): Report!
-    "EDITOR. Removing trashes the item; correcting or keeping shows it again. The reporter is told by email."
+    "EDITOR. Removing trashes the item; correcting or keeping shows it again as before, unless its visibility was changed since the report hid it. The reporter is told by email."
     reportHandle(id: ID!, outcome: ReportOutcome!, message: String): Report!
     "ADMIN. Added last."
     albumKindCreate(input: AlbumKindInput!): AlbumKind!
@@ -208,7 +208,7 @@ type AlbumKind {
     position: Int!
     "The first by position: used for new albums."
     isDefault: Boolean!
-    "Albums of this kind, trashed ones included."
+    "For ADMIN every album of this kind, trashed ones included (a kind in use cannot be deleted); for everyone else the albums of this kind they may see."
     albumCount: Int!
 }
 
@@ -262,6 +262,18 @@ type Album {
     trashedAt: Instant
     createdAt: Instant!
     lastModifiedAt: Instant
+}
+
+type AlbumVisibilityResult {
+    album: Album!
+    "Items that kept their visibility because an open report hides them until it is handled."
+    skipped: Int!
+}
+
+type ItemsUpdateResult {
+    items: [Item!]!
+    "Items that kept their visibility because an open report hides them until it is handled."
+    skipped: Int!
 }
 
 type VisibilityCount {
@@ -429,7 +441,7 @@ input ItemsInput {
 enum UploadOutcome {
     "A new item, processing in Immich."
     CREATED
-    "The file is already in Spexgram: see existingItem, or existingAlbumTitle when the caller may not see the item."
+    "The file is already in Spexgram: see existingItem and existingAlbumTitle, as far as the caller may see them; else only that it is in the archive."
     DUPLICATE
     "Immich does not accept the file, e.g. it is not a photo or video; see message."
     REJECTED
@@ -443,7 +455,7 @@ type UploadResult {
     item: Item
     "The item that already has the file, when the caller may see it."
     existingItem: Item
-    "The album of the item that already has the file, also when the caller may not see the item."
+    "The title of the album of the item that already has the file, when the caller may see that album."
     existingAlbumTitle: String
     "Immich's reason for rejecting the file."
     message: String

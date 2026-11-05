@@ -25,6 +25,7 @@ import nu.fgv.spexgram.server.item.ItemDtos.ImmichJob;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemDto;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemInput;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemsInput;
+import nu.fgv.spexgram.server.item.ItemDtos.ItemsUpdateResult;
 import nu.fgv.spexgram.server.item.ItemDtos.UnsortedDay;
 import nu.fgv.spexgram.server.item.ItemDtos.UploadResult;
 import org.jspecify.annotations.Nullable;
@@ -120,7 +121,7 @@ public class ItemGraphqlApi {
     }
 
     @MutationMapping
-    public List<ItemDto> itemsUpdate(@Argument final List<UUID> ids, @Argument final ItemsInput input) {
+    public ItemsUpdateResult itemsUpdate(@Argument final List<UUID> ids, @Argument final ItemsInput input) {
         return service.updateAll(ids, input);
     }
 

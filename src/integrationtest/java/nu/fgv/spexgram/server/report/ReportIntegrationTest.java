@@ -59,7 +59,7 @@ class ReportIntegrationTest extends AbstractIntegrationTest {
         final String item = readyPhotos(album, folder, "Jag på scenen").getFirst();
 
         graphQl(EDITOR)
-                .document("mutation($ids: [ID!]!) { itemsUpdate(ids: $ids, input: {visibility: PUBLIC}) { id } }")
+                .document("mutation($ids: [ID!]!) { itemsUpdate(ids: $ids, input: {visibility: PUBLIC}) { items { id } } }")
                 .variable("ids", List.of(item)).execute().errors().verify();
         graphQl(null).document("query($id: ID!) { item(id: $id) { id } }").variable("id", item).execute()
                 .path("item.id").entity(String.class).isEqualTo(item);
@@ -95,7 +95,7 @@ class ReportIntegrationTest extends AbstractIntegrationTest {
         final String album = createAlbum("PUBLIC");
         final String item = readyPhotos(album, folder, "Publik bild").getFirst();
 
-        graphQl(EDITOR).document("mutation($ids: [ID!]!) { itemsUpdate(ids: $ids, input: {visibility: PUBLIC}) { id } }")
+        graphQl(EDITOR).document("mutation($ids: [ID!]!) { itemsUpdate(ids: $ids, input: {visibility: PUBLIC}) { items { id } } }")
                 .variable("ids", List.of(item)).execute().errors().verify();
         expectError(graphQl(null).document(REPORT)
                 .variable("input", Map.of("itemId", item, "reason", "OTHER", "email", "besokare@example.org", "turnstileToken", "bad"))
@@ -103,6 +103,50 @@ class ReportIntegrationTest extends AbstractIntegrationTest {
         expectError(graphQl(null).document(REPORT)
                 .variable("input", Map.of("itemId", item, "reason", "OTHER", "turnstileToken", "ok"))
                 .execute(), "BAD_REQUEST");
+    }
+
+    @Test
+    void aTokenSolvedOnAnotherSiteIsRefusedAndVisitorsAreLimitedPerHour() throws Exception {
+        final String album = createAlbum("PUBLIC");
+        final String item = readyPhotos(album, folder, "Publik bild").getFirst();
+
+        graphQl(EDITOR).document("mutation($ids: [ID!]!) { itemsUpdate(ids: $ids, input: {visibility: PUBLIC}) { items { id } } }")
+                .variable("ids", List.of(item)).execute().errors().verify();
+        expectError(graphQl(null).document(REPORT)
+                .variable("input", Map.of("itemId", item, "reason", "OTHER", "email", "a@example.org", "turnstileToken", "elsewhere"))
+                .execute(), "BAD_REQUEST");
+        // The same address, at most five an hour (the refused one above counts)
+        for (int i = 0; i < 4; i++) {
+            graphQl(null).document(REPORT)
+                    .variable("input", Map.of("itemId", item, "reason", "OTHER", "email", "a@example.org", "turnstileToken", "ok"))
+                    .execute().errors().verify();
+        }
+        expectError(graphQl(null).document(REPORT)
+                .variable("input", Map.of("itemId", item, "reason", "OTHER", "email", "a@example.org", "turnstileToken", "ok"))
+                .execute(), "BAD_REQUEST");
+    }
+
+    @Test
+    void anItemAnOpenReportHidesKeepsItsVisibilityThroughBulkChanges() throws Exception {
+        final String album = createAlbum("PUBLIC");
+        final List<String> items = readyPhotos(album, folder, "Jag", "Andra");
+        final String report = graphQl(VIEWER).document(REPORT)
+                .variable("input", Map.of("itemId", items.getFirst(), "reason", "I_AM_IN_IT"))
+                .execute()
+                .path("reportCreate.id").entity(String.class).get();
+
+        graphQl(EDITOR).document("mutation($id: ID!) { albumSetVisibility(id: $id, visibility: PUBLIC, items: true) { skipped } }")
+                .variable("id", album).execute()
+                .path("albumSetVisibility.skipped").entity(Integer.class).isEqualTo(1);
+        graphQl(EDITOR).document("mutation($ids: [ID!]!) { itemsUpdate(ids: $ids, input: {visibility: MEMBERS}) { skipped items { id visibility } } }")
+                .variable("ids", items).execute()
+                .path("itemsUpdate.skipped").entity(Integer.class).isEqualTo(1)
+                .path("itemsUpdate.items[0].visibility").entity(String.class).isEqualTo("UNPUBLISHED")
+                .path("itemsUpdate.items[1].visibility").entity(String.class).isEqualTo("MEMBERS");
+        graphQl(EDITOR).document("mutation($id: ID!) { reportHandle(id: $id, outcome: KEPT) { status } }").variable("id", report)
+                .execute().errors().verify();
+        graphQl(EDITOR).document("query($id: ID!) { item(id: $id) { visibility } }").variable("id", items.getFirst()).execute()
+                .path("item.visibility").entity(String.class).isEqualTo("MEMBERS");
     }
 
     @Test

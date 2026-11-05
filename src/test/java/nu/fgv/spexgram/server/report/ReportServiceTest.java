@@ -21,6 +21,9 @@ import nu.fgv.spexgram.server.item.Item;
 import nu.fgv.spexgram.server.visibility.Visibility;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -60,5 +63,59 @@ class ReportServiceTest {
 
         assertThat(ReportService.hide(item, false)).isEqualTo(Visibility.PUBLIC);
         assertThat(item.getVisibility()).isEqualTo(Visibility.UNPUBLISHED);
+    }
+
+    private static Report report(final Item item, final boolean visitor, final String at) {
+        final Report report = new Report();
+
+        report.setItem(item);
+        report.setVisitorEmail(visitor ? "besok@example.org" : null);
+        report.setCreatedAt(Instant.parse(at));
+        report.setHiddenFrom(ReportService.hide(item, visitor));
+        return report;
+    }
+
+    @Test
+    void keepingShowsTheItemAgainAsBefore() {
+        final Item item = item(Visibility.PUBLIC);
+        final Report report = report(item, false, "2026-11-01T10:00:00Z");
+
+        ReportService.showAgain(report, item, List.of());
+
+        assertThat(item.getVisibility()).isEqualTo(Visibility.PUBLIC);
+    }
+
+    @Test
+    void anItemAnEditorChangedSinceTheReportHidItIsLeftAsItIs() {
+        final Item item = item(Visibility.PUBLIC);
+        final Report report = report(item, true, "2026-11-01T10:00:00Z");
+
+        item.setVisibility(Visibility.UNPUBLISHED);
+        ReportService.showAgain(report, item, List.of());
+
+        assertThat(item.getVisibility()).isEqualTo(Visibility.UNPUBLISHED);
+    }
+
+    @Test
+    void anotherOpenReportKeepsHidingTheItemWhicheverIsHandledFirst() {
+        final Item first = item(Visibility.PUBLIC);
+        final Report visitors = report(first, true, "2026-11-01T10:00:00Z");
+        final Report members = report(first, false, "2026-11-02T10:00:00Z");
+
+        // The later, member's, report handled first: back to what the visitor's report left
+        ReportService.showAgain(members, first, List.of(visitors));
+        assertThat(first.getVisibility()).isEqualTo(Visibility.MEMBERS);
+        ReportService.showAgain(visitors, first, List.of());
+        assertThat(first.getVisibility()).isEqualTo(Visibility.PUBLIC);
+
+        final Item second = item(Visibility.PUBLIC);
+        final Report visitors2 = report(second, true, "2026-11-01T10:00:00Z");
+        final Report members2 = report(second, false, "2026-11-02T10:00:00Z");
+
+        // The earlier one handled first: the later one still hides it, and learns what it was before both
+        ReportService.showAgain(visitors2, second, List.of(members2));
+        assertThat(second.getVisibility()).isEqualTo(Visibility.UNPUBLISHED);
+        ReportService.showAgain(members2, second, List.of());
+        assertThat(second.getVisibility()).isEqualTo(Visibility.PUBLIC);
     }
 }

@@ -17,12 +17,14 @@
 
 package nu.fgv.spexgram.server.report;
 
+import nu.fgv.spexgram.server.config.GraphqlConfig;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemDto;
 import nu.fgv.spexgram.server.item.ItemService;
 import nu.fgv.spexgram.server.report.ReportService.ReportDto;
 import nu.fgv.spexgram.server.report.ReportService.ReportInput;
 import org.jspecify.annotations.Nullable;
 import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.ContextValue;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
@@ -60,8 +62,9 @@ public class ReportGraphqlApi {
     }
 
     @MutationMapping
-    public ReportDto reportCreate(@Argument final ReportInput input, final Locale locale) {
-        return service.create(input, locale);
+    public ReportDto reportCreate(@Argument final ReportInput input, final Locale locale,
+                                  @ContextValue(name = GraphqlConfig.CLIENT_IP, required = false) final @Nullable String clientIp) {
+        return service.create(input, locale, clientIp);
     }
 
     @MutationMapping

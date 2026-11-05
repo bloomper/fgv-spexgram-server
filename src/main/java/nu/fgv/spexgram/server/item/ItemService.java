@@ -29,6 +29,7 @@ import nu.fgv.spexgram.server.item.ItemDtos.ItemDto;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemInput;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemPage;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemsInput;
+import nu.fgv.spexgram.server.item.ItemDtos.ItemsUpdateResult;
 import nu.fgv.spexgram.server.item.ItemDtos.UnsortedDay;
 import nu.fgv.spexgram.server.item.ItemDtos.UploadResult;
 import nu.fgv.spexgram.server.util.error.BadRequestException;
@@ -58,6 +59,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -179,11 +181,12 @@ public class ItemService {
     }
 
     /**
-     * A page of an album's items the viewer may see, by when they were taken.
+     * A page of an album's items the viewer may see, by when they were taken. Like the album's item count and cover, it
+     * resolves as Spexipedia's service account for it, which also sees members' items, as spexAlbums does.
      */
     @Transactional(readOnly = true)
     public ItemPage albumItems(final UUID albumId, final int page, final int size) {
-        final Viewer viewer = viewerService.current();
+        final Viewer viewer = viewerService.currentForSpexipedia();
         final Album album = albumRepository.findByUuid(albumId).filter(found -> ItemViews.canSee(found, viewer))
                 .orElseThrow(() -> new ResourceNotFoundException(Album.class, albumId));
         final int p = Math.max(page, 0);
@@ -202,7 +205,7 @@ public class ItemService {
      */
     @Transactional(readOnly = true)
     public Map<UUID, Integer> itemCounts(final Collection<UUID> albumIds) {
-        final Viewer viewer = viewerService.current();
+        final Viewer viewer = viewerService.currentForSpexipedia();
         final Map<UUID, Integer> counts = new HashMap<>();
 
         for (final UUID albumId : albumIds) {
@@ -217,7 +220,7 @@ public class ItemService {
      */
     @Transactional(readOnly = true)
     public @Nullable ItemDto cover(final UUID albumId) {
-        final Viewer viewer = viewerService.current();
+        final Viewer viewer = viewerService.currentForSpexipedia();
         final Album album = albumRepository.findByUuid(albumId).orElse(null);
 
         if (album == null) {
@@ -226,6 +229,7 @@ public class ItemService {
 
         final Specification<Item> visible = ItemSpecifications.visibleTo(viewer).and(inAlbum(album));
         final Item chosen = album.getCoverItemId() == null ? null : repository.findById(album.getCoverItemId())
+                .filter(item -> item.getAlbum() != null && item.getAlbum().getId().equals(album.getId()))
                 .filter(item -> ItemViews.canSee(item, viewer) && !item.isTrashed() && item.getStatus() == ItemStatus.READY)
                 .orElse(null);
         final Item cover = chosen != null ? chosen : repository.findAll(visible, PageRequest.of(0, 1, BY_TAKEN)).stream().findFirst().orElse(null);
@@ -379,8 +383,12 @@ public class ItemService {
         return views.toDto(item, viewer);
     }
 
+    /**
+     * Changes what is given for every item. Items an open report hides keep their visibility until it is handled, and are
+     * counted as skipped; an item moved to another album stops being its old album's cover.
+     */
     @Transactional
-    public List<ItemDto> updateAll(final List<UUID> ids, final ItemsInput input) {
+    public ItemsUpdateResult updateAll(final List<UUID> ids, final ItemsInput input) {
         final Viewer viewer = viewerService.current();
 
         viewer.requireEditor();
@@ -389,6 +397,8 @@ public class ItemService {
         final Album album = input.albumId() == null ? null : albumRepository.findByUuid(input.albumId())
                 .orElseThrow(() -> new ResourceNotFoundException(Album.class, input.albumId()));
 
+        final Set<Long> hidden = input.visibility() == null || items.isEmpty() ? Set.of() : repository.findHiddenByOpenReports(items);
+
         for (final Item item : items) {
             if (input.caption() != null) {
                 item.setCaption(StringUtils.hasText(input.caption()) ? input.caption().strip() : null);
@@ -396,11 +406,11 @@ public class ItemService {
             if (input.photographer() != null) {
                 item.setPhotographer(text(input.photographer()));
             }
-            if (input.visibility() != null) {
+            if (input.visibility() != null && !hidden.contains(item.getId())) {
                 item.setVisibility(input.visibility());
             }
             if (album != null) {
-                item.setAlbum(album);
+                moveTo(item, album);
             }
         }
 
@@ -423,7 +433,19 @@ public class ItemService {
             auditService.record(input.visibility() != null ? "VISIBILITY" : "UPDATE", "ITEM", item.getUuid(),
                     "%s: %s".formatted(describe(item), String.join(", ", changes)));
         }
-        return toDtos(items, viewer);
+        return new ItemsUpdateResult(toDtos(items, viewer), hidden.size());
+    }
+
+    /**
+     * Moves the item to the album; it stops being its old album's cover.
+     */
+    static void moveTo(final Item item, final Album album) {
+        final Album old = item.getAlbum();
+
+        if (old != null && !old.getId().equals(album.getId()) && item.getId().equals(old.getCoverItemId())) {
+            old.setCoverItemId(null);
+        }
+        item.setAlbum(album);
     }
 
     @Transactional

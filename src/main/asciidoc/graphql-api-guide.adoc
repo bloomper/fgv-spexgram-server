@@ -62,6 +62,7 @@ An item is seen with the narrower of its own and its album's (``Item.effectiveVi
 Nothing in an unpublished or trashed album, and no trashed, unsorted, processing or failed item, is shown outside the editors.
 New albums start unpublished; editors' uploads start as members' items; contributions start unpublished, waiting for review.
 ``albumSetVisibility`` with ``items: true`` sets the album's items too; ``Album.visibilityCounts`` tells editors how many items would become public.
+Items an open report hides (5.5) keep their visibility through ``albumSetVisibility`` and ``itemsUpdate`` until the report is handled; both answer how many they ``skipped``.
 
 Every service resolves the viewer and filters what it returns; GraphQL operations hold no rules of their own.
 Visitors never get an uploader, a position or an original; members get positions unless admins hide them (``Settings.showPositions``) and originals only when admins allow it (``Settings.userDownloadsOriginals``, ``Limits.canDownloadOriginals``).
@@ -71,6 +72,8 @@ Visitors never get an uploader, a position or an original; members get positions
 
 ``Item.media`` holds signed addresses on the media server for the thumbnail, the preview (about 1440 pixels, without metadata), the video and, for those allowed, the original, valid until ``expiresAt``.
 How they are signed is described under xref:api-guide.adoc#media_server[Media server].
+Immich transcodes every video (the API sets its policy to ``all``), and its browser version carries none of the original's metadata, such as where and when it was filmed; ``videoUrl`` is signed for anyone only once that version exists, and otherwise only for viewers who may download originals, since Immich would play the original.
+A video is ``READY`` only once transcoded.
 A page open longer than its addresses last asks ``itemMedia(ids)`` for fresh ones: the items among the ids the viewer may see, at most 200, without rendering anything else again.
 Ask for the items again when a page has been open longer.
 
@@ -101,6 +104,10 @@ Editors are emailed and handle reports with ``reportHandle``: ``REMOVED`` trashe
 
 ``search`` finds albums by title, place and description and items by caption and photographer, with MySQL's full-text indexes; every word must match as a prefix.
 ``smartSearch`` asks Immich's search by content (a multilingual CLIP model), leaves out what the viewer may not see and asks for more until the limit is reached.
+Visitors' reports are limited to five an hour per client address (``X-Client-IP`` from the web, else the caller's) and per email address, and their Turnstile token must have been solved on the web's host.
+Kind counts (``AlbumKind.albumCount``) count what the viewer may see; admins get every album, trashed ones included.
+A member holds at most ten uploads open at a time, each counted against the day's contribution quota at its declared length.
+
 ``mapItems`` lists items with a position for the map, each with a signed thumbnail address and when it runs out (``expiresAt``).
 
 [[spexipedia]]

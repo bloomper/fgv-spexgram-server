@@ -22,6 +22,7 @@ import nu.fgv.spexgram.server.album.AlbumDtos.AlbumFilter;
 import nu.fgv.spexgram.server.album.AlbumDtos.AlbumInput;
 import nu.fgv.spexgram.server.album.AlbumDtos.AlbumPage;
 import nu.fgv.spexgram.server.album.AlbumDtos.AlbumSpexDto;
+import nu.fgv.spexgram.server.album.AlbumDtos.AlbumVisibilityResult;
 import nu.fgv.spexgram.server.album.AlbumDtos.CategoryDto;
 import nu.fgv.spexgram.server.album.AlbumDtos.VisibilityCount;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemDto;
@@ -138,7 +139,7 @@ public class AlbumGraphqlApi {
     }
 
     @MutationMapping
-    public AlbumDto albumSetVisibility(@Argument final UUID id, @Argument final Visibility visibility, @Argument final @Nullable Boolean items) {
+    public AlbumVisibilityResult albumSetVisibility(@Argument final UUID id, @Argument final Visibility visibility, @Argument final @Nullable Boolean items) {
         return service.setVisibility(id, visibility, Boolean.TRUE.equals(items));
     }
 

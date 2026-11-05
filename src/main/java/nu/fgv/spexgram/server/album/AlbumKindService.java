@@ -19,11 +19,14 @@ package nu.fgv.spexgram.server.album;
 
 
 import nu.fgv.spexgram.server.audit.AuditService;
+import nu.fgv.spexgram.server.item.ItemSpecifications;
 import nu.fgv.spexgram.server.user.Caller;
 import nu.fgv.spexgram.server.user.CallerService;
 import nu.fgv.spexgram.server.util.error.BadRequestException;
 import nu.fgv.spexgram.server.util.error.ConflictException;
 import nu.fgv.spexgram.server.util.error.ResourceNotFoundException;
+import nu.fgv.spexgram.server.visibility.Viewer;
+import nu.fgv.spexgram.server.visibility.ViewerService;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,13 +54,18 @@ public class AlbumKindService {
     static final int MAX_NAME = 100;
 
     private final AlbumKindRepository repository;
+    private final AlbumRepository albumRepository;
     private final CallerService callerService;
+    private final ViewerService viewerService;
     private final AuditService auditService;
 
-    public AlbumKindService(final AlbumKindRepository repository, final CallerService callerService,
+    public AlbumKindService(final AlbumKindRepository repository, final AlbumRepository albumRepository,
+                            final CallerService callerService, final ViewerService viewerService,
                             final AuditService auditService) {
         this.repository = repository;
+        this.albumRepository = albumRepository;
         this.callerService = callerService;
+        this.viewerService = viewerService;
         this.auditService = auditService;
     }
 
@@ -88,15 +96,24 @@ public class AlbumKindService {
     }
 
     /**
-     * How many albums, trashed ones included, have each kind.
+     * How many albums have each kind: for admins every album, trashed ones included, since a kind in use cannot be
+     * deleted; for everyone else only the albums they may see.
      */
     @Transactional(readOnly = true)
     public Map<UUID, Integer> albumCounts(final Collection<UUID> ids) {
-        final Map<Long, UUID> uuids = repository.findAll().stream().collect(Collectors.toMap(AlbumKind::getId, AlbumKind::getUuid));
+        final Viewer viewer = viewerService.current();
         final Map<UUID, Integer> counts = new HashMap<>();
 
-        for (final Object[] row : repository.countAlbumsByKind()) {
-            counts.put(uuids.get((Long) row[0]), ((Number) row[1]).intValue());
+        if (viewer.isAdmin()) {
+            final Map<Long, UUID> uuids = repository.findAll().stream().collect(Collectors.toMap(AlbumKind::getId, AlbumKind::getUuid));
+
+            for (final Object[] row : repository.countAlbumsByKind()) {
+                counts.put(uuids.get((Long) row[0]), ((Number) row[1]).intValue());
+            }
+        } else {
+            for (final Album album : albumRepository.findAll(ItemSpecifications.albumsVisibleTo(viewer))) {
+                counts.merge(album.getKind().getUuid(), 1, Integer::sum);
+            }
         }
         return ids.stream().distinct().collect(Collectors.toMap(Function.identity(), id -> counts.getOrDefault(id, 0)));
     }

@@ -63,6 +63,12 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
 
     List<Item> findByUploadedBySubjectAndContributionStatusIsNotNullOrderByCreatedAtDesc(String subject);
 
+    /**
+     * The items among these that an open report hides, which keep their visibility until it is handled.
+     */
+    @Query("SELECT DISTINCT r.item.id FROM Report r WHERE r.status = nu.fgv.spexgram.server.report.Report.Status.OPEN AND r.hiddenFrom IS NOT NULL AND r.item IN :items")
+    Set<Long> findHiddenByOpenReports(@Param("items") Collection<Item> items);
+
     @Query("SELECT i.immichAssetId FROM Item i WHERE i.immichAssetId IS NOT NULL")
     Set<UUID> findAllAssetIds();
 
