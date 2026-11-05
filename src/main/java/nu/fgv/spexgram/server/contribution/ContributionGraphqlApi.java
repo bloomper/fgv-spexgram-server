@@ -62,8 +62,8 @@ public class ContributionGraphqlApi {
     }
 
     @QueryMapping
-    public List<AlbumSuggestionDto> albumSuggestions(@Argument final @Nullable Boolean open) {
-        return service.suggestions(open == null || open);
+    public List<AlbumSuggestionDto> albumSuggestions(@Argument final @Nullable Boolean open, @Argument final @Nullable Boolean mine) {
+        return service.suggestions(open, Boolean.TRUE.equals(mine));
     }
 
     @SchemaMapping(typeName = "AlbumSuggestion", field = "album")

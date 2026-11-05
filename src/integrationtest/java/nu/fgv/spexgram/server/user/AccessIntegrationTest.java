@@ -58,6 +58,28 @@ class AccessIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void albumSuggestionsAreTheMembersOwnAndEveryonesForEditorsUnlessMine() {
+        final String suggestion = graphQl(VIEWER)
+                .document("mutation { albumSuggest(input: {title: \"Kräftskivan\"}) { id album { id suggested } } }")
+                .execute()
+                .path("albumSuggest.album.suggested").entity(Boolean.class).isEqualTo(true)
+                .path("albumSuggest.id").entity(String.class).get();
+
+        graphQl(VIEWER).document("{ albumSuggestions { id status } }").execute()
+                .path("albumSuggestions[*].id").entityList(String.class).containsExactly(suggestion);
+        graphQl(EDITOR).document("{ all: albumSuggestions { id } open: albumSuggestions(open: true) { id } mine: albumSuggestions(mine: true) { id } }")
+                .execute()
+                .path("all[*].id").entityList(String.class).contains(suggestion)
+                .path("open[*].id").entityList(String.class).contains(suggestion)
+                .path("mine").entityList(Object.class).hasSize(0);
+        graphQl(EDITOR).document("mutation($id: ID!) { albumSuggestionReview(id: $id, accept: true) { status } }").variable("id", suggestion)
+                .execute().path("albumSuggestionReview.status").entity(String.class).isEqualTo("ACCEPTED");
+        graphQl(VIEWER).document("{ handled: albumSuggestions(open: false) { id } open: albumSuggestions(open: true) { id } }").execute()
+                .path("handled[*].id").entityList(String.class).containsExactly(suggestion)
+                .path("open").entityList(Object.class).hasSize(0);
+    }
+
+    @Test
     void editingIsForEditorsAndSettingsForAdmins() {
         expectError(graphQl(VIEWER).document("mutation { albumCreate(input: {title: \"Fest\"}) { id } }").execute(), "FORBIDDEN");
         expectError(graphQl(null).document("mutation { albumCreate(input: {title: \"Fest\"}) { id } }").execute(), "FORBIDDEN");

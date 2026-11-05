@@ -27,6 +27,7 @@ import nu.fgv.spexgram.server.mail.Mailer;
 import nu.fgv.spexgram.server.user.Caller;
 import nu.fgv.spexgram.server.user.UserDirectory;
 import nu.fgv.spexgram.server.util.Locales;
+import nu.fgv.spexgram.server.util.OpenFilter;
 import nu.fgv.spexgram.server.util.error.BadRequestException;
 import nu.fgv.spexgram.server.util.error.DirectoryUnavailableException;
 import nu.fgv.spexgram.server.util.error.ResourceNotFoundException;
@@ -198,20 +199,23 @@ public class ReportService {
     }
 
     /**
-     * Open or handled reports for editors; with mine, or for members, the caller's own.
+     * Everyone's reports for editors, unless mine; the member's own otherwise. Open ones, handled ones, or all when open
+     * is null.
      */
     @Transactional(readOnly = true)
-    public List<ReportDto> reports(final boolean open, final boolean mine) {
+    public List<ReportDto> reports(final @Nullable Boolean open, final boolean mine) {
         final Viewer viewer = viewerService.current();
         final Caller caller = viewer.requireMember();
 
         if (viewer.isEditor() && !mine) {
-            return (open ? repository.findByStatusOrderByCreatedAtAsc(Report.Status.OPEN)
-                    : repository.findByStatusOrderByHandledAtDesc(Report.Status.HANDLED))
-                    .stream().map(report -> toDto(report, true)).toList();
+            final List<Report> found = open == null ? repository.findAllByOrderByCreatedAtDesc()
+                    : open ? repository.findByStatusOrderByCreatedAtAsc(Report.Status.OPEN)
+                    : repository.findByStatusOrderByHandledAtDesc(Report.Status.HANDLED);
+
+            return found.stream().map(report -> toDto(report, true)).toList();
         }
         return repository.findByReporterSubjectOrderByCreatedAtDesc(caller.subject()).stream()
-                .filter(report -> open == (report.getStatus() == Report.Status.OPEN))
+                .filter(report -> OpenFilter.wanted(open, report.getStatus() == Report.Status.OPEN))
                 .map(report -> toDto(report, false))
                 .toList();
     }

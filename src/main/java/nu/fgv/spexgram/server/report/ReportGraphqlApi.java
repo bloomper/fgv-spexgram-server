@@ -51,7 +51,7 @@ public class ReportGraphqlApi {
 
     @QueryMapping
     public List<ReportDto> reports(@Argument final @Nullable Boolean open, @Argument final @Nullable Boolean mine) {
-        return service.reports(open == null || open, Boolean.TRUE.equals(mine));
+        return service.reports(open, Boolean.TRUE.equals(mine));
     }
 
     @SchemaMapping(typeName = "Report", field = "item")

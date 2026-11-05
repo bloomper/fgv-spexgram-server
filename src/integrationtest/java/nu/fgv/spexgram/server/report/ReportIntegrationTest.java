@@ -120,5 +120,13 @@ class ReportIntegrationTest extends AbstractIntegrationTest {
         graphQl(EDITOR).document("mutation($id: ID!) { reportHandle(id: $id, outcome: REMOVED) { outcome } }").variable("id", report)
                 .execute().path("reportHandle.outcome").entity(String.class).isEqualTo("REMOVED");
         graphQl(EDITOR).document("{ trash { items { id } } }").execute().path("trash.items[*].id").entityList(String.class).containsExactly(item);
+        // Without open, every report: the member's own handled one, in one call
+        graphQl(VIEWER).document("{ reports(mine: true) { id status } }").execute()
+                .path("reports[*].id").entityList(String.class).containsExactly(report)
+                .path("reports[0].status").entity(String.class).isEqualTo("HANDLED");
+        graphQl(VIEWER).document("{ reports(open: true) { id } }").execute().path("reports").entityList(Object.class).hasSize(0);
+        graphQl(EDITOR).document("{ reports(mine: true) { id } }").execute().path("reports").entityList(Object.class).hasSize(0);
+        graphQl(EDITOR).document("{ reports(open: false) { id } }").execute()
+                .path("reports[*].id").entityList(String.class).containsExactly(report);
     }
 }

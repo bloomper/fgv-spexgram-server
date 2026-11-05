@@ -40,5 +40,7 @@ public interface AlbumSuggestionRepository extends JpaRepository<AlbumSuggestion
 
     List<AlbumSuggestion> findByStatusNotOrderByCreatedAtDesc(AlbumSuggestion.Status status);
 
+    List<AlbumSuggestion> findAllByOrderByCreatedAtDesc();
+
     long deleteByHandledAtBefore(Instant before);
 }

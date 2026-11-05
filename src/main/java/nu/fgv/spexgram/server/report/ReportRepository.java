@@ -41,6 +41,8 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
 
     List<Report> findByReporterSubjectOrderByCreatedAtDesc(String subject);
 
+    List<Report> findAllByOrderByCreatedAtDesc();
+
     List<Report> findByItemAndStatus(Item item, Report.Status status);
 
     long deleteByHandledAtBefore(Instant before);

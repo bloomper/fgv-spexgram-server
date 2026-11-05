@@ -36,6 +36,7 @@ import nu.fgv.spexgram.server.item.ItemViews;
 import nu.fgv.spexgram.server.mail.Mailer;
 import nu.fgv.spexgram.server.user.Caller;
 import nu.fgv.spexgram.server.user.UserDirectory;
+import nu.fgv.spexgram.server.util.OpenFilter;
 import nu.fgv.spexgram.server.util.error.BadRequestException;
 import nu.fgv.spexgram.server.util.error.DirectoryUnavailableException;
 import nu.fgv.spexgram.server.util.error.ResourceNotFoundException;
@@ -259,21 +260,24 @@ public class ContributionService {
     }
 
     /**
-     * Open suggestions for editors; the member's own, open or handled, otherwise.
+     * Everyone's suggestions for editors, unless mine; the member's own otherwise. Open ones, handled ones, or all when
+     * open is null.
      */
     @Transactional(readOnly = true)
-    public List<AlbumSuggestionDto> suggestions(final boolean open) {
+    public List<AlbumSuggestionDto> suggestions(final @Nullable Boolean open, final boolean mine) {
         final Viewer viewer = viewerService.current();
         final Caller caller = viewer.requireMember();
 
-        if (viewer.isEditor()) {
-            return (open ? suggestionRepository.findByStatusOrderByCreatedAtAsc(AlbumSuggestion.Status.OPEN)
-                    : suggestionRepository.findByStatusNotOrderByCreatedAtDesc(AlbumSuggestion.Status.OPEN))
-                    .stream().map(suggestion -> toDto(suggestion, true)).toList();
+        if (viewer.isEditor() && !mine) {
+            final List<AlbumSuggestion> found = open == null ? suggestionRepository.findAllByOrderByCreatedAtDesc()
+                    : open ? suggestionRepository.findByStatusOrderByCreatedAtAsc(AlbumSuggestion.Status.OPEN)
+                    : suggestionRepository.findByStatusNotOrderByCreatedAtDesc(AlbumSuggestion.Status.OPEN);
+
+            return found.stream().map(suggestion -> toDto(suggestion, true)).toList();
         }
         return suggestionRepository.findBySuggestedBySubjectOrderByCreatedAtDesc(caller.subject()).stream()
-                .filter(suggestion -> open == (suggestion.getStatus() == AlbumSuggestion.Status.OPEN))
-                .map(suggestion -> toDto(suggestion, false))
+                .filter(suggestion -> OpenFilter.wanted(open, suggestion.getStatus() == AlbumSuggestion.Status.OPEN))
+                .map(suggestion -> toDto(suggestion, viewer.isEditor()))
                 .toList();
     }
 
