@@ -45,6 +45,7 @@ import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 /**
  * Uploads: created, appended to chunk by chunk, then claimed by the operation that sends the file to Immich. Only the
@@ -224,8 +225,13 @@ public class UploadService {
     @Transactional
     public void wipe() throws IOException {
         repository.deleteAllInBatch();
-        FileSystemUtils.deleteRecursively(folder);
         Files.createDirectories(folder);
+        // Empties the folder rather than deleting it: in a container it is a mount point, which can't be deleted
+        try (Stream<Path> children = Files.list(folder)) {
+            for (final Path child : children.toList()) {
+                FileSystemUtils.deleteRecursively(child);
+            }
+        }
     }
 
     private UploadSession owned(final Caller caller, final String id) {

@@ -174,4 +174,16 @@ class UploadServiceTest {
         verify(repository).deleteById(session.getId());
         assertThat(folder.resolve(session.getId())).doesNotExist();
     }
+
+    @Test
+    void wipeEmptiesTheFolderButKeepsIt() throws Exception {
+        Files.writeString(folder.resolve("file"), "data");
+        Files.createDirectories(folder.resolve("nested"));
+        Files.writeString(folder.resolve("nested").resolve("file"), "data");
+
+        service.wipe();
+
+        verify(repository).deleteAllInBatch();
+        assertThat(folder).isEmptyDirectory();
+    }
 }

@@ -81,11 +81,11 @@ services:
       MANAGEMENT_SERVER_PORT: 9000
       LOGGING_FILE_PATH: /data/log_data
       SERVER_FORWARD_HEADERS_STRATEGY: native
-      API_KEYCLOAK_URL: http://keycloak-server:8080/auth
+      SPEXGRAM_KEYCLOAK_URL: http://keycloak-server:8080/auth
       API_KEYCLOAK_REALM: ${API_KEYCLOAK_REALM}
       API_KEYCLOAK_ADMIN_CLIENT_ID: ${API_KEYCLOAK_ADMIN_CLIENT_ID}
       API_WEB_URL: ${SPEXGRAM_WEB_ORIGIN:-http://localhost:3004}
-      API_MEDIA_BASE_URL: https://media.spexgram.fgv.local.nu:8443
+      SPEXGRAM_MEDIA_BASE_URL: https://media.spexgram.fgv.local.nu:8443
       API_UPLOADS_ROOT: /data/uploads
       API_IMMICH_URL: http://immich-server:2283
       API_IMMICH_KEYS_DIR: /data/immich-keys
