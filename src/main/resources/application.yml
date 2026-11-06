@@ -100,6 +100,8 @@ spexgram:
     admin-client-secret: ${API_KEYCLOAK_ADMIN_CLIENT_SECRET:}
   security:
     authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexgram,fgv-spexipedia-service}
+    # Shared with the web, which sends it with the visitor's address (X-Client-IP)
+    client-ip-secret: ${API_CLIENT_IP_SECRET:}
   media:
     # The DNS-only media hostname served by spexgram-media (nginx)
     base-url: ${API_MEDIA_BASE_URL:https://media.spexgram.fgv.local.nu:8443}

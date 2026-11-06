@@ -19,6 +19,7 @@ package nu.fgv.spexgram.server.config;
 import graphql.analysis.MaxQueryComplexityInstrumentation;
 import graphql.analysis.MaxQueryDepthInstrumentation;
 import nu.fgv.spexgram.server.util.graphql.CustomScalars;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.graphql.execution.RuntimeWiringConfigurer;
@@ -26,7 +27,10 @@ import org.springframework.graphql.server.WebGraphQlInterceptor;
 import org.springframework.util.StringUtils;
 
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Map;
+import java.util.Optional;
 
 
 /**
@@ -40,24 +44,38 @@ public class GraphqlConfig {
 
     /**
      * The GraphQL context's key for the visitor's address: the web passes it in {@value #CLIENT_IP_HEADER} (from
-     * Cloudflare's or the proxy's header), else the caller's own address is used. Only used to limit visitors' reports.
+     * Cloudflare's or the proxy's header) together with the shared secret in {@value #CLIENT_IP_SECRET_HEADER}, else
+     * the caller's own address is used. The API is public, so a named address without the right secret is ignored.
+     * Only used to limit visitors' reports.
      */
     public static final String CLIENT_IP = "clientIp";
     public static final String CLIENT_IP_HEADER = "X-Client-IP";
+    public static final String CLIENT_IP_SECRET_HEADER = "X-Client-IP-Secret";
 
     @Bean
-    public WebGraphQlInterceptor clientIpInterceptor() {
+    public WebGraphQlInterceptor clientIpInterceptor(final SpexgramProperties properties) {
+        final byte[] secret = Optional.ofNullable(properties.security())
+                .map(SpexgramProperties.Security::clientIpSecret)
+                .filter(StringUtils::hasText)
+                .map(value -> value.getBytes(StandardCharsets.UTF_8))
+                .orElse(null);
+
         return (request, chain) -> {
             final String header = request.getHeaders().getFirst(CLIENT_IP_HEADER);
             final InetSocketAddress remote = request.getRemoteAddress();
-            final String ip = StringUtils.hasText(header) ? header.strip()
-                    : remote == null ? null : remote.getHostString();
+            final boolean named = StringUtils.hasText(header)
+                    && fromWeb(secret, request.getHeaders().getFirst(CLIENT_IP_SECRET_HEADER));
+            final String ip = named ? header.strip() : remote == null ? null : remote.getHostString();
 
             if (ip != null) {
                 request.configureExecutionInput((input, builder) -> builder.graphQLContext(Map.of(CLIENT_IP, ip)).build());
             }
             return chain.next(request);
         };
+    }
+
+    static boolean fromWeb(final byte @Nullable [] secret, final @Nullable String given) {
+        return secret != null && given != null && MessageDigest.isEqual(secret, given.getBytes(StandardCharsets.UTF_8));
     }
 
     @Bean

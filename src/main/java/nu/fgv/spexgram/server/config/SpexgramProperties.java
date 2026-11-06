@@ -53,7 +53,12 @@ public record SpexgramProperties(String timeZone,
                            String adminClientId, String adminClientSecret) {
     }
 
-    public record Security(List<String> authorizedParties) {
+    /**
+     * @param authorizedParties the clients ({@code azp}) whose tokens the API accepts
+     * @param clientIpSecret    the secret shared with the web, which sends it with the visitor's address; without it,
+     *                          or when it doesn't match, the API ignores the address the caller names
+     */
+    public record Security(List<String> authorizedParties, String clientIpSecret) {
     }
 
     /**
