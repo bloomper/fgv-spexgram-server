@@ -1,0 +1,673 @@
+scalar Instant
+scalar Void
+
+# Who may call what is in each description: "Anyone" works without a token and shows only what the viewer may see
+# (visitors: public albums and items), USER, EDITOR and ADMIN are client roles on fgv-spexgram, SPEXIPEDIA is
+# Spexipedia's service account.
+
+type Query {
+    "Anyone with a token. The caller and their roles; null without a token."
+    me: Me
+    "Anyone. The start page's text in the request's language (the public one for visitors) and the contact address."
+    startPage: StartPage!
+    "Anyone. The limits uploads and contributions are checked against."
+    limits: Limits!
+    "ADMIN."
+    settings: Settings!
+    "Anyone. Albums the viewer may see, newest first; every album outside the trash for EDITOR."
+    albums(filter: AlbumFilter, page: Int = 0, size: Int = 50): AlbumPage!
+    "Anyone. An album the viewer may see, else null (whether it exists is not told)."
+    album(id: ID!): Album
+    "Anyone. The most recently added albums the viewer may see."
+    recentAlbums(limit: Int = 12): [Album!]!
+    "Anyone. An item the viewer may see, else null. A public item is reachable here even in an album for members."
+    item(id: ID!): Item
+    "Anyone. Items taken on today's date in earlier years, newest first."
+    thisDayInHistory(limit: Int = 30): [Item!]!
+    "Anyone; SPEXIPEDIA also gets members' items. The albums of a spex and its revivals, oldest first."
+    spexAlbums(spexId: ID!): [Album!]!
+    "Anyone, for other applications: the public items among the ids, as visitors see them, in the given order; SPEXIPEDIA also gets members' items. At most 200."
+    publicItems(ids: [ID!]!): [Item!]!
+    "Anyone. The items among the ids the viewer may see, in the given order, with fresh signed addresses: for renewing them on a page open for long. At most 200."
+    itemMedia(ids: [ID!]!): [Item!]!
+    "Anyone. The album kinds, in order; the first is the default."
+    albumKinds: [AlbumKind!]!
+    "Anyone. The categories of the albums the viewer may see."
+    categories: [Category!]!
+    "Anyone. The years of the albums the viewer may see, newest first."
+    years: [Int!]!
+    "Anyone. The spex with albums the viewer may see, newest first, revivals counted with themselves."
+    spexWithAlbums: [AlbumSpex!]!
+    "Anyone. Albums and items whose titles, places, descriptions, captions or photographers match the words."
+    search(q: String!, limit: Int = 50): SearchResult!
+    "USER. Items whose content matches the words, by Immich's search by content (CLIP), within the filter."
+    smartSearch(q: String!, filter: AlbumFilter, limit: Int = 50): [Item!]!
+    "USER. Items with a position the viewer may see; empty for USER when admins hide positions."
+    mapItems(filter: AlbumFilter): [MapItem!]!
+    "USER. The caller's contributions, newest first: waiting for review, and accepted."
+    myContributions: [Item!]!
+    "USER. The caller's album suggestions; everyone's for EDITOR unless mine. Open ones, handled ones, or all when open is null; newest first, except everyone's open ones oldest first."
+    albumSuggestions(open: Boolean, mine: Boolean = false): [AlbumSuggestion!]!
+    "USER. The caller's reports; everyone's for EDITOR unless mine. Open ones, handled ones, or all when open is null; newest first, except everyone's open ones oldest first."
+    reports(open: Boolean, mine: Boolean = false): [Report!]!
+    "EDITOR. Contributions waiting for review, oldest first, of one album or all."
+    contributions(albumId: ID): [Item!]!
+    "EDITOR. Items in Immich that belong to no album, grouped by the day they were taken."
+    unsorted: [UnsortedDay!]!
+    "EDITOR. Trashed albums and items, most recently trashed first."
+    trash: Trash!
+    "EDITOR. Spex in Spexregister matching a title or year: each original, then its revivals, newest original first."
+    spexSearch(q: String!): [Spex!]!
+    "EDITOR. The audit log, newest first: the caller's own changes, or everyone's for ADMIN, narrowed by the filter."
+    auditLog(page: Int = 0, size: Int = 50, filter: AuditFilter): AuditPage!
+    "EDITOR. Who made the changes in the audit log the caller sees; only the caller unless ADMIN."
+    auditActors: [AuditActor!]!
+    "ADMIN. Immich's version, job queues and disk, and items that failed."
+    immichStatus: ImmichStatus!
+    "ADMIN. The scheduled maintenance jobs, with their schedules and how their latest runs went."
+    maintenanceJobs: [MaintenanceJobStatus!]!
+}
+
+type Mutation {
+    "EDITOR. New albums start unpublished."
+    albumCreate(input: AlbumInput!): Album!
+    "EDITOR."
+    albumUpdate(id: ID!, input: AlbumInput!): Album!
+    "EDITOR. With items, also sets every item of the album outside the trash and review to the same visibility, except those an open report hides (skipped)."
+    albumSetVisibility(id: ID!, visibility: Visibility!, items: Boolean = false): AlbumVisibilityResult!
+    "EDITOR. One of the album's items; null for the first."
+    albumSetCover(id: ID!, itemId: ID): Album!
+    "EDITOR. Its items go with it."
+    albumTrash(id: ID!): Album!
+    "EDITOR."
+    albumRestore(id: ID!): Album!
+    "ADMIN. Only a trashed album: deletes it with its items and their files, or with keepItems leaves them unsorted."
+    albumDelete(id: ID!, keepItems: Boolean = false): Void
+    "EDITOR. Sends finished uploads to Immich as items of the album, members' items. One result per upload, in order."
+    itemsAdd(albumId: ID!, uploadIds: [String!]!): [UploadResult!]!
+    "EDITOR. Replaces the item's file with a finished upload, e.g. a cropped photo; the old file is deleted."
+    itemReplaceFile(id: ID!, uploadId: String!): Item!
+    "EDITOR. Replaces the item's caption, photographer, date taken and position."
+    itemUpdate(id: ID!, input: ItemInput!): Item!
+    "EDITOR. Changes what is given for every item; unsorted items are sorted by giving an album, and an item moved away stops being its old album's cover. Items an open report hides keep their visibility (skipped)."
+    itemsUpdate(ids: [ID!]!, input: ItemsInput!): ItemsUpdateResult!
+    "EDITOR."
+    itemsTrash(ids: [ID!]!): [Item!]!
+    "EDITOR. Items of a trashed album go back to it once it is restored."
+    itemsRestore(ids: [ID!]!): [Item!]!
+    "ADMIN. Only trashed items; deletes their files in Immich."
+    itemsDelete(ids: [ID!]!): Void
+    "ADMIN. Deletes every trashed album and item with their files."
+    trashEmpty: Void
+    "ADMIN. Starts one of Immich's jobs again for the items."
+    immichJobRun(itemIds: [ID!]!, job: ImmichJob!): Void
+    "USER. Sends finished uploads as contributions to an album for members or the public, or one the caller suggested; they wait for review."
+    contributionsAdd(albumId: ID!, uploadIds: [String!]!): [UploadResult!]!
+    "USER. Takes back one of the caller's contributions that is still waiting; its file is deleted."
+    contributionWithdraw(itemId: ID!): Void
+    "EDITOR. Accepts contributions as members' items, or rejects them, deleting their files. The contributors are told by email, at most once a day."
+    contributionsReview(itemIds: [ID!]!, accept: Boolean!, message: String): [ContributionReview!]!
+    "USER. Suggests an album, which is unpublished until an editor accepts it; the caller can contribute to it meanwhile."
+    albumSuggest(input: AlbumSuggestionInput!): AlbumSuggestion!
+    "EDITOR. Accepting publishes the album for members; rejecting deletes it with its contributions. The suggester is told by email."
+    albumSuggestionReview(id: ID!, accept: Boolean!, message: String): AlbumSuggestion!
+    "Anyone who may see the item. Visitors give an email address and a Turnstile token. I_AM_IN_IT hides the item at once until it is handled."
+    reportCreate(input: ReportInput!): Report!
+    "EDITOR. Removing trashes the item; correcting or keeping shows it again as before, unless its visibility was changed since the report hid it. The reporter is told by email."
+    reportHandle(id: ID!, outcome: ReportOutcome!, message: String): Report!
+    "ADMIN. Added last."
+    albumKindCreate(input: AlbumKindInput!): AlbumKind!
+    "ADMIN."
+    albumKindUpdate(id: ID!, input: AlbumKindInput!): AlbumKind!
+    "ADMIN. Every kind, in the new order; the first becomes the default."
+    albumKindsReorder(ids: [ID!]!): [AlbumKind!]!
+    "ADMIN. Only a kind no album uses, trashed ones included, and not the last one."
+    albumKindDelete(id: ID!): Void
+    "ADMIN."
+    settingsUpdate(input: SettingsInput!): Settings!
+    "ADMIN. Starts the job in the background, as its schedule would. False when it is already running."
+    maintenanceJobRun(job: MaintenanceJob!): Boolean!
+}
+
+"Who sees an album or an item. An item is seen with the narrower of its own and its album's visibility, except that a public item is public on its own in an album for members."
+enum Visibility {
+    "Editors and admins."
+    UNPUBLISHED
+    "Everyone with USER."
+    MEMBERS
+    "Everyone, also visitors who are not logged in."
+    PUBLIC
+}
+
+type Me {
+    username: String!
+    displayName: String
+    email: String
+    roles: [String!]!
+}
+
+type StartPage {
+    welcome: String
+    "Shown to visitors, e.g. for questions about a photo."
+    contactEmail: String
+}
+
+type Limits {
+    "The largest file accepted, in bytes."
+    maxUploadBytes: Float!
+    "Longer videos are rejected after upload; they belong in Spexflix."
+    maxVideoMinutes: Int!
+    "Per member and day."
+    contributionMaxItems: Int!
+    contributionMaxGb: Int!
+    "Whether the caller may download originals, videos and albums as zips."
+    canDownloadOriginals: Boolean!
+}
+
+type Settings {
+    "The start page's text for members."
+    welcomeSv: String
+    welcomeEn: String
+    "The start page's text for visitors."
+    publicWelcomeSv: String
+    publicWelcomeEn: String
+    contactEmail: String
+    maxUploadGb: Int!
+    maxVideoMinutes: Int!
+    contributionMaxItems: Int!
+    contributionMaxGb: Int!
+    "Whether USER may download originals, videos and albums as zips; EDITOR and ADMIN always may."
+    userDownloadsOriginals: Boolean!
+    "Whether USER sees positions, with items and on the map; EDITOR always does, visitors never."
+    showPositions: Boolean!
+}
+
+input SettingsInput {
+    welcomeSv: String
+    welcomeEn: String
+    publicWelcomeSv: String
+    publicWelcomeEn: String
+    contactEmail: String
+    "1 to 50."
+    maxUploadGb: Int!
+    "1 to 120."
+    maxVideoMinutes: Int!
+    "1 to 10000."
+    contributionMaxItems: Int!
+    "1 to 500."
+    contributionMaxGb: Int!
+    userDownloadsOriginals: Boolean!
+    showPositions: Boolean!
+}
+
+"What an album is of, e.g. a show or a party. Configured by admins."
+type AlbumKind {
+    id: ID!
+    nameSv: String!
+    nameEn: String!
+    position: Int!
+    "The first by position: used for new albums."
+    isDefault: Boolean!
+    "For ADMIN every album of this kind, trashed ones included (a kind in use cannot be deleted); for everyone else the albums of this kind they may see."
+    albumCount: Int!
+}
+
+input AlbumKindInput {
+    nameSv: String!
+    nameEn: String!
+}
+
+input AlbumFilter {
+    "The category of one of the album's spex."
+    categoryId: ID
+    "The year of one of the album's spex, or of its date."
+    year: Int
+    "Albums about the spex or, when it is an original, one of its revivals."
+    spexId: ID
+    kindId: ID
+    "EDITOR only."
+    visibility: Visibility
+}
+
+type AlbumPage {
+    albums: [Album!]!
+    totalCount: Int!
+    page: Int!
+    size: Int!
+}
+
+type Album {
+    id: ID!
+    title: String!
+    kind: AlbumKind!
+    "The spex the album is about, the main one first; empty when it is about no one spex."
+    spex: [AlbumSpex!]!
+    "yyyy-mm-dd"
+    dateFrom: String
+    "yyyy-mm-dd, the last day of a period; null for a single day."
+    dateTo: String
+    place: String
+    description: String
+    visibility: Visibility!
+    "The chosen cover if the viewer may see it, else the album's first item the viewer may see."
+    cover: Item
+    "Items the viewer may see."
+    itemCount: Int!
+    "Items the viewer may see, by when they were taken; for EDITOR also processing, failed and unpublished ones, and for a contributor their own waiting for review."
+    items(page: Int = 0, size: Int = 100): ItemPage!
+    "EDITOR. How many items outside the trash have each visibility of their own, e.g. to tell how many become public."
+    visibilityCounts: [VisibilityCount!]!
+    "Anyone who may see the album (not sensitive): whether it is a member's suggestion that waits for an editor's review."
+    suggested: Boolean!
+    trashedAt: Instant
+    createdAt: Instant!
+    lastModifiedAt: Instant
+}
+
+type AlbumVisibilityResult {
+    album: Album!
+    "Items that kept their visibility because an open report hides them until it is handled."
+    skipped: Int!
+}
+
+type ItemsUpdateResult {
+    items: [Item!]!
+    "Items that kept their visibility because an open report hides them until it is handled."
+    skipped: Int!
+}
+
+type VisibilityCount {
+    visibility: Visibility!
+    count: Int!
+}
+
+type AlbumSpex {
+    id: ID!
+    title: String
+    year: Int
+    revival: Boolean
+    "The original, for a revival."
+    parentId: ID
+    "The original spex: the parent of a revival, else the spex itself."
+    familyId: ID!
+    categoryId: ID
+    categoryName: String
+    "In spexWithAlbums: the albums of the spex the viewer may see."
+    albumCount: Int
+}
+
+input AlbumInput {
+    "Spex in Spexregister, the main one first. Empty when the album is about no one spex."
+    spexIds: [ID!]! = []
+    "Defaults to the main spex's title and year and the kind; required without a spex."
+    title: String
+    "A kind; defaults to the first one for a new album and to the current one for an existing album."
+    kindId: ID
+    "yyyy-mm-dd"
+    dateFrom: String
+    "yyyy-mm-dd, for a period"
+    dateTo: String
+    place: String
+    description: String
+}
+
+type Category {
+    id: ID!
+    name: String!
+    albumCount: Int!
+}
+
+type Spex {
+    id: ID!
+    title: String
+    year: Int
+    revival: Boolean!
+    "The original, for a revival."
+    parentId: ID
+    categoryName: String
+}
+
+enum ItemType {
+    PHOTO
+    VIDEO
+}
+
+enum ItemStatus {
+    "Immich is making thumbnails or transcoding."
+    PROCESSING
+    READY
+    "See failure."
+    FAILED
+}
+
+enum ItemFailure {
+    "The video is longer than allowed; its file was deleted. It belongs in Spexflix."
+    TOO_LONG
+    "Immich did not finish processing it in six hours."
+    NOT_PROCESSED
+    "Immich no longer has the file."
+    MISSING
+}
+
+enum ContributionStatus {
+    WAITING
+    ACCEPTED
+}
+
+type ItemPage {
+    items: [Item!]!
+    totalCount: Int!
+    page: Int!
+    size: Int!
+}
+
+type Item {
+    id: ID!
+    "The item's album if the viewer may see it; null for unsorted items and for a public item in an album the viewer may not see."
+    album: AlbumRef
+    type: ItemType!
+    status: ItemStatus!
+    "EDITOR."
+    failure: ItemFailure
+    "When it was taken, in local time, yyyy-mm-ddThh:mm:ss."
+    takenAt: String
+    caption: String
+    photographer: String
+    "USER (unless admins hide positions); never for visitors."
+    latitude: Float
+    longitude: Float
+    width: Int
+    height: Int
+    durationMs: Float
+    "Its own visibility."
+    visibility: Visibility!
+    "The visibility it is seen with, its album's taken into account."
+    effectiveVisibility: Visibility!
+    "For contributions; shown to EDITOR and to the contributor."
+    contributionStatus: ContributionStatus
+    "Whether the caller uploaded it."
+    mine: Boolean!
+    "EDITOR. Who uploaded it."
+    uploadedBy: String
+    "EDITOR."
+    originalFileName: String
+    "EDITOR. Bytes."
+    fileSize: Float
+    trashedAt: Instant
+    createdAt: Instant!
+    "Signed addresses on the media server; null when the file is gone, e.g. a rejected video."
+    media: Media
+}
+
+"An album as an item refers to it."
+type AlbumRef {
+    id: ID!
+    title: String!
+    visibility: Visibility!
+}
+
+"Addresses on the media server, valid until expiresAt (at least four hours). Ask again when a page has been open longer."
+type Media {
+    "About 250 pixels."
+    thumbnailUrl: String!
+    "About 1440 pixels on the long side, JPEG without metadata; what visitors download."
+    previewUrl: String!
+    "For videos: Immich's version for the browser, with byte ranges."
+    videoUrl: String
+    "The uploaded file, only for viewers who may download originals (Limits.canDownloadOriginals)."
+    originalUrl: String
+    expiresAt: Instant!
+}
+
+input ItemInput {
+    caption: String
+    photographer: String
+    "yyyy-mm-ddThh:mm:ss, local time"
+    takenAt: String
+    "Both or neither; neither removes the position."
+    latitude: Float
+    longitude: Float
+}
+
+"Only what is given changes."
+input ItemsInput {
+    caption: String
+    photographer: String
+    visibility: Visibility
+    "Moves the items to the album; sorts unsorted items."
+    albumId: ID
+}
+
+enum UploadOutcome {
+    "A new item, processing in Immich."
+    CREATED
+    "The file is already in Spexgram: see existingItem and existingAlbumTitle, as far as the caller may see them; else only that it is in the archive."
+    DUPLICATE
+    "Immich does not accept the file, e.g. it is not a photo or video; see message."
+    REJECTED
+}
+
+type UploadResult {
+    uploadId: String!
+    fileName: String!
+    outcome: UploadOutcome!
+    "The new item."
+    item: Item
+    "The item that already has the file, when the caller may see it."
+    existingItem: Item
+    "The title of the album of the item that already has the file, when the caller may see that album."
+    existingAlbumTitle: String
+    "Immich's reason for rejecting the file."
+    message: String
+}
+
+type ContributionReview {
+    id: ID!
+    "The item, while it exists."
+    itemId: ID
+    accepted: Boolean!
+    message: String
+    reviewedAt: Instant!
+}
+
+enum SuggestionStatus {
+    OPEN
+    ACCEPTED
+    REJECTED
+}
+
+input AlbumSuggestionInput {
+    title: String!
+    "yyyy-mm-dd"
+    dateFrom: String
+    dateTo: String
+    place: String
+    description: String
+    kindId: ID
+}
+
+type AlbumSuggestion {
+    id: ID!
+    title: String!
+    "The album, while it exists; the suggester and editors may see it while the suggestion is open."
+    album: Album
+    suggestedBy: String
+    status: SuggestionStatus!
+    message: String
+    createdAt: Instant!
+    handledAt: Instant
+}
+
+enum ReportReason {
+    "Hides the item at once: a members' item from members, a public item from visitors."
+    I_AM_IN_IT
+    WRONG_CAPTION_OR_ALBUM
+    INAPPROPRIATE
+    OTHER
+}
+
+enum ReportStatus {
+    OPEN
+    HANDLED
+}
+
+enum ReportOutcome {
+    "The item goes to the trash."
+    REMOVED
+    "The item was corrected and is shown again."
+    CORRECTED
+    "The item is kept and shown again."
+    KEPT
+}
+
+input ReportInput {
+    itemId: ID!
+    reason: ReportReason!
+    message: String
+    "Visitors only, required: where the answer goes."
+    email: String
+    "Visitors only, required: the token from the Cloudflare Turnstile widget."
+    turnstileToken: String
+}
+
+type Report {
+    id: ID!
+    "The item, while it exists and the viewer may see it."
+    item: Item
+    reason: ReportReason!
+    message: String
+    status: ReportStatus!
+    "EDITOR. The reporting member's name, or the visitor's email address."
+    reporter: String
+    "Whether a visitor made it."
+    byVisitor: Boolean!
+    outcome: ReportOutcome
+    outcomeMessage: String
+    createdAt: Instant!
+    handledAt: Instant
+}
+
+type SearchResult {
+    albums: [Album!]!
+    items: [Item!]!
+}
+
+type MapItem {
+    id: ID!
+    latitude: Float!
+    longitude: Float!
+    takenAt: String
+    thumbnailUrl: String
+    "When thumbnailUrl stops working; ask again after that."
+    expiresAt: Instant
+}
+
+type UnsortedDay {
+    "yyyy-mm-dd, or null for items without a date taken."
+    date: String
+    items: [Item!]!
+}
+
+type Trash {
+    albums: [Album!]!
+    items: [Item!]!
+}
+
+enum ImmichJob {
+    REGENERATE_THUMBNAIL
+    REFRESH_METADATA
+    TRANSCODE_VIDEO
+}
+
+type ImmichStatus {
+    "Whether the API has set Immich up and reaches it."
+    available: Boolean!
+    version: String
+    queues: [ImmichQueue!]!
+    usedBytes: Float
+    availableBytes: Float
+    sizeBytes: Float
+    "Items whose processing failed or whose file is gone."
+    failedItems: [Item!]!
+}
+
+type ImmichQueue {
+    "Immich's name, e.g. thumbnailGeneration, metadataExtraction, videoConversion, smartSearch."
+    name: String!
+    paused: Boolean!
+    active: Float!
+    waiting: Float!
+    failed: Float!
+}
+
+type AuditPage {
+    entries: [AuditLogEntry!]!
+    totalCount: Int!
+    page: Int!
+    size: Int!
+}
+
+type AuditLogEntry {
+    id: ID!
+    at: Instant!
+    "Who made the change, by their subject."
+    actorId: String!
+    actorName: String
+    action: String!
+    "ALBUM, ITEM, ALBUM_KIND, REPORT, SETTINGS and so on."
+    entityType: String!
+    entityId: ID
+    summary: String!
+}
+
+"What to show of the audit log; every field is optional."
+input AuditFilter {
+    "What was changed, e.g. ALBUM or ITEM."
+    entityType: String
+    "CREATE, UPDATE, VISIBILITY, UPLOAD, TRASH, RESTORE, DELETE, REVIEW and so on."
+    action: String
+    "Who made the change; only ADMIN sees others' changes."
+    actorId: String
+    "Changes from this instant on."
+    from: Instant
+    "Changes before this instant."
+    to: Instant
+    "Text the summary contains."
+    q: String
+    "One record's changes."
+    entityId: ID
+}
+
+type AuditActor {
+    id: String!
+    name: String
+}
+
+"""
+A scheduled maintenance job: copying the current spex data from Spexregister (SPEX_REFRESH), listing items in Immich
+that Spexgram does not know as unsorted (UNSORTED_SCAN), following items Immich is processing (PROCESSING_POLL),
+checking that every item still exists in Immich (ITEM_CHECK), removing uploads that were never used (UPLOAD_CLEANUP),
+deleting people, reports and reviews past their retention (RETENTION) and telling contributors of reviews
+(CONTRIBUTION_MAIL).
+"""
+enum MaintenanceJob {
+    SPEX_REFRESH
+    UNSORTED_SCAN
+    PROCESSING_POLL
+    ITEM_CHECK
+    UPLOAD_CLEANUP
+    RETENTION
+    CONTRIBUTION_MAIL
+}
+
+"A maintenance job and how its latest run went. Runs are remembered until the server restarts."
+type MaintenanceJobStatus {
+    job: MaintenanceJob!
+    "The job's cron expression, in the server's time zone, or null when it is not scheduled."
+    schedule: String
+    running: Boolean!
+    lastStartedAt: Instant
+    lastFinishedAt: Instant
+    "Whether the latest run finished without an error; null while it runs."
+    lastSucceeded: Boolean
+}

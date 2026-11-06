@@ -1,0 +1,132 @@
+= Spexgram Server GraphQL API Guide
+:doctype: book
+:icons: font
+:source-highlighter: highlightjs
+:toc: left
+:toclevels: 4
+
+xref:index.adoc[Back to start page]
+
+[[schema]]
+== Schema
+
+The endpoint is ``/api/graphql``.
+If running locally, the corresponding URL is https://api.spexgram.fgv.local.nu:8443/api/graphql.
+
+The endpoint answers without an access token too: visitors get what editors have made public.
+With a token from the Keycloak client ``fgv-spexgram``, or from Spexipedia's service account, the caller gets what their roles allow.
+What each operation requires is in its description in the schema; "Anyone" means it works without a token and shows only what the viewer may see.
+
+Introspection is enabled only with the Spring profile ``local``.
+The schema's source is ``src/main/resources/graphql/schema.graphqls``.
+
+[[errors]]
+== Errors
+
+The GraphQL API provides the error code in ``extensions.classification`` and a message in the request's language in ``message``:
+
+|===
+|Classification|Meaning
+
+|``UNAUTHORIZED``|The request's token is not valid.
+|``FORBIDDEN``|The user lacks the role the operation requires; for visitors, the operation is for members.
+|``NOT_FOUND``|The resource does not exist. Also returned for an album or item the user may not see, so that a link does not tell whether it exists.
+|``BAD_REQUEST``|The input breaks a rule, e.g. a visitor's report without a passing Turnstile token.
+|``CONFLICT``|Someone else changed the resource since the user read it. Ask them to reload.
+|``IMMICH_UNAVAILABLE``|Immich cannot be reached. Albums and captions are still shown; uploads are refused.
+|``SPEXREGISTER_UNAVAILABLE``|Spexregister cannot be reached. Only ``spexSearch`` and picking a new spex fail.
+|``DIRECTORY_UNAVAILABLE``|The FGV realm's users cannot be read in Keycloak.
+
+|===
+
+Note that invalid input according to the schema will be detected and reported as validation errors by the client which means that the structure is different from described above.
+
+[[roles]]
+== Roles and visibility
+
+Spexgram Server uses the following roles, which are client roles on ``fgv-spexgram`` in Keycloak:
+
+|===
+|Role|Description
+
+|(none)|Visitors, without a token or without ``USER``: public albums and items, text search, reports with an email address and Turnstile
+|USER|Members: albums and items for members too, search by content, the map, contributions, reports
+|EDITOR|Creates and edits albums, uploads, captions, sets visibility, reviews contributions, handles reports, sorts unsorted items, trashes
+|ADMIN|Everything an editor does, plus settings, album kinds, emptying the trash, Immich's status, maintenance jobs and everyone's audit log
+|SPEXIPEDIA|Held only by Spexipedia's service account: ``publicItems`` and ``spexAlbums`` also return members' items, with thumbnails and previews only
+
+|===
+
+Albums and items each have a visibility: ``UNPUBLISHED``, ``MEMBERS`` or ``PUBLIC``.
+An item is seen with the narrower of its own and its album's (``Item.effectiveVisibility``), except that an item marked ``PUBLIC`` is public on its own in an album for members: visitors reach it by its id and from other applications, but its ``album`` is null for them and the album is not listed.
+Nothing in an unpublished or trashed album, and no trashed, unsorted, processing or failed item, is shown outside the editors.
+New albums start unpublished; editors' uploads start as members' items; contributions start unpublished, waiting for review.
+``albumSetVisibility`` with ``items: true`` sets the album's items too; ``Album.visibilityCounts`` tells editors how many items would become public.
+Items an open report hides (5.5) keep their visibility through ``albumSetVisibility`` and ``itemsUpdate`` until the report is handled; both answer how many they ``skipped``.
+
+Every service resolves the viewer and filters what it returns; GraphQL operations hold no rules of their own.
+Visitors never get an uploader, a position or an original; members get positions unless admins hide them (``Settings.showPositions``) and originals only when admins allow it (``Settings.userDownloadsOriginals``, ``Limits.canDownloadOriginals``).
+
+[[media]]
+== Media
+
+``Item.media`` holds signed addresses on the media server for the thumbnail, the preview (about 1440 pixels, without metadata), the video and, for those allowed, the original, valid until ``expiresAt``.
+How they are signed is described under xref:api-guide.adoc#media_server[Media server].
+Immich transcodes every video (the API sets its policy to ``all``), and its browser version carries none of the original's metadata, such as where and when it was filmed; ``videoUrl`` is signed for anyone only once that version exists, and otherwise only for viewers who may download originals, since Immich would play the original.
+A video is ``READY`` only once transcoded.
+A page open longer than its addresses last asks ``itemMedia(ids)`` for fresh ones: the items among the ids the viewer may see, at most 200, without rendering anything else again.
+Ask for the items again when a page has been open longer.
+
+[[uploads]]
+== Uploads, processing and contributions
+
+Files are uploaded with tus (see the xref:api-guide.adoc[HTTP API]) and given to ``itemsAdd`` (editors) or ``contributionsAdd`` (members), which send them to Immich.
+Each upload gets an ``UploadResult``: ``CREATED`` with the new item, ``DUPLICATE`` with the item that already has the file (Immich recognises it by its checksum), or ``REJECTED`` with Immich's reason, e.g. a file that is not a photo or video.
+Items are ``PROCESSING`` until Immich has made their thumbnails and, for videos, transcoded them when needed; a job follows Immich every 20 seconds.
+A video longer than ``Settings.maxVideoMinutes`` is rejected then (``ItemFailure.TOO_LONG``) and its file deleted; it belongs in Spexflix.
+
+``albumSuggestions`` and ``reports`` list the caller's own, or everyone's for editors unless ``mine``; ``open`` picks open or handled ones, and without it they list all.
+``Album.suggested`` tells anyone who may see the album whether it is a member's suggestion still waiting for review.
+
+Members contribute to albums for members or the public, and to albums they suggested (``albumSuggest``), at most ``contributionMaxItems`` items and ``contributionMaxGb`` GB a day.
+Editors see ``contributions`` and review them with ``contributionsReview``: accepted ones become members' items, rejected ones are deleted from Immich at once.
+Contributors are emailed the outcome once a day.
+
+[[reports]]
+== Reports
+
+Anyone who may see an item may report it with ``reportCreate``; visitors give an email address and the token of the Cloudflare Turnstile widget, which the API checks with Cloudflare.
+A report with the reason ``I_AM_IN_IT`` hides the item at once: a visitor's report makes a public item a members' item, a member's report makes it unpublished.
+Editors are emailed and handle reports with ``reportHandle``: ``REMOVED`` trashes the item, ``CORRECTED`` and ``KEPT`` show it again as before; the reporter is emailed the outcome.
+
+[[search]]
+== Search and map
+
+``search`` finds albums by title, place and description and items by caption and photographer, with MySQL's full-text indexes; every word must match as a prefix.
+``smartSearch`` asks Immich's search by content (a multilingual CLIP model), leaves out what the viewer may not see and asks for more until the limit is reached.
+Visitors' reports are limited to five an hour per client address (``X-Client-IP`` from the web, else the caller's) and per email address, and their Turnstile token must have been solved on the web's host.
+Kind counts (``AlbumKind.albumCount``) count what the viewer may see; admins get every album, trashed ones included.
+A member holds at most ten uploads open at a time, each counted against the day's contribution quota at its declared length.
+
+``mapItems`` lists items with a position for the map, each with a signed thumbnail address and when it runs out (``expiresAt``).
+
+[[spexipedia]]
+== Spexipedia and other applications
+
+Other applications ask without a token which public albums belong to a spex (``spexAlbums``) and for signed addresses of public items (``publicItems``, which answers as for a visitor whoever asks).
+Spexipedia's service account, with the ``SPEXIPEDIA`` role, also gets members' items; it shows them only to its logged-in users.
+Stable web addresses are ``/albums/<id>``, ``/items/<id>`` and ``/spex/<spexId>``.
+
+[[audit]]
+== Audit
+
+Editors' changes are recorded in the audit log (``auditLog``): who, when, what and a summary, changes of visibility included.
+Editors see their own changes, admins everyone's.
+
+[[spexregister]]
+== Spexregister
+
+Spex, their revivals and categories are read from Spexregister, which Spexgram Server calls as the service account ``fgv-spexgram-service`` with Spexregister's ``MEDIA`` role.
+An album keeps a copy of its spex, refreshed every night, so the archive works while Spexregister is down.
+
+xref:index.adoc[Back to start page]

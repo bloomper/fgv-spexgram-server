@@ -1,0 +1,232 @@
+name: fgv-spexgram-server
+
+x-immich-environment: &immich-environment
+  DB_HOSTNAME: immich-postgres
+  DB_USERNAME: immich
+  DB_DATABASE_NAME: immich
+  DB_PASSWORD_FILE: /run/secrets/IMMICH_DB_PASSWORD
+  REDIS_HOSTNAME: immich-valkey
+
+services:
+  spexgram-mysql:
+    image: 'mysql:8.4'
+    restart: unless-stopped
+    command: --log-error=/var/log/mysql/error.log
+    environment:
+      MYSQL_HOST: localhost
+      MYSQL_DATABASE: ${FGV_SPEXGRAM_MYSQL_DATABASE}
+      MYSQL_ROOT_USER: ${FGV_SPEXGRAM_MYSQL_ROOT_USER}
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD
+      MYSQL_USER: ${FGV_SPEXGRAM_MYSQL_USER}
+      MYSQL_PASSWORD_FILE: /run/secrets/FGV_SPEXGRAM_MYSQL_USER_PASSWORD
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    ports:
+      - "127.0.0.1:3310:3306"
+    volumes:
+      - fgv_spexgram_mysql_data:/var/lib/mysql
+      - fgv_spexgram_mysql_log:/var/log/mysql
+    secrets:
+      - FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD
+      - FGV_SPEXGRAM_MYSQL_USER_PASSWORD
+
+  # Signed media addresses, passed on to Immich with the read-only key the API leaves in ./data/immich-keys
+  spexgram-media:
+    image: 'nginx:1.29-alpine'
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - |
+        while [ ! -s /run/immich-keys/media.key ]; do echo "waiting for the API to create media.key"; sleep 5; done
+        export API_MEDIA_SIGNING_KEY=$$(cat /run/secrets/API_MEDIA_SIGNING_KEY)
+        export IMMICH_MEDIA_API_KEY=$$(cat /run/immich-keys/media.key)
+        exec /docker-entrypoint.sh nginx -g 'daemon off;'
+    environment:
+      SPEXGRAM_WEB_ORIGIN: ${SPEXGRAM_WEB_ORIGIN:-http://localhost:3004}
+      IMMICH_HOST: immich-server:2283
+      MEDIA_CACHE_SIZE: 1g
+    healthcheck:
+      test: [ "CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/healthz" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      immich-server:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8086:80"
+    volumes:
+      - ${SPEXGRAM_DEPLOY:-../fgv-spexgram-deploy}/media/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./data/immich-keys:/run/immich-keys:ro
+    networks:
+      - default
+      - fgv
+    secrets:
+      - API_MEDIA_SIGNING_KEY
+
+  spexgram-api:
+    image: 'bloomper/fgv-spexgram-server:develop'
+    #platform: linux/arm64
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:mysql://spexgram-mysql/${FGV_SPEXGRAM_MYSQL_DATABASE}
+      SPRING_DATASOURCE_USERNAME: ${FGV_SPEXGRAM_MYSQL_USER}
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 9000
+      LOGGING_FILE_PATH: /data/log_data
+      SERVER_FORWARD_HEADERS_STRATEGY: native
+      API_KEYCLOAK_URL: http://keycloak-server:8080/auth
+      API_KEYCLOAK_REALM: ${API_KEYCLOAK_REALM}
+      API_KEYCLOAK_ADMIN_CLIENT_ID: ${API_KEYCLOAK_ADMIN_CLIENT_ID}
+      API_WEB_URL: ${SPEXGRAM_WEB_ORIGIN:-http://localhost:3004}
+      API_MEDIA_BASE_URL: https://media.spexgram.fgv.local.nu:8443
+      API_UPLOADS_ROOT: /data/uploads
+      API_IMMICH_URL: http://immich-server:2283
+      API_IMMICH_KEYS_DIR: /data/immich-keys
+      API_SPEXREGISTER_GRAPHQL_URL: http://spexregister-api:8080/api/graphql
+      API_IMPORT_SAMPLE_DATA: ${API_IMPORT_SAMPLE_DATA:-false}
+      API_SAMPLE_DATA_SIZE: ${API_SAMPLE_DATA_SIZE:-small}
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
+      MAIL_FROM: noreply@fgv.local.nu
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak-server:8080/auth/realms/fgv/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: https://auth.fgv.local.nu:8443/auth/realms/fgv
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000;printf \"GET /actuator/health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n\" >&3;grep -q \"^HTTP/1.1 200\" <&3" ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+    depends_on:
+      spexgram-mysql:
+        condition: service_healthy
+      immich-server:
+        condition: service_healthy
+    volumes:
+      - fgv_spexgram_api_log:/data/log_data
+      - ./data/uploads:/data/uploads
+      - ./data/immich-keys:/data/immich-keys
+    networks:
+      - default
+      - fgv
+    secrets:
+      - source: FGV_SPEXGRAM_MYSQL_USER_PASSWORD
+        target: MYSQL_API_USER_PASSWORD
+      - API_KEYCLOAK_ADMIN_CLIENT_SECRET
+      - API_KEYCLOAK_SERVICE_CLIENT_SECRET
+      - API_MEDIA_SIGNING_KEY
+      - API_IMMICH_ADMIN_PASSWORD
+      - API_TURNSTILE_SECRET_KEY
+
+  # Immich on the project's network only; published on localhost:2283 for an API started from the IDE
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-v3.3.6}
+    restart: unless-stopped
+    environment:
+      <<: *immich-environment
+      IMMICH_MACHINE_LEARNING_URL: http://immich-machine-learning:3003
+    healthcheck:
+      disable: false
+    depends_on:
+      immich-postgres:
+        condition: service_healthy
+      immich-valkey:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:2283:2283"
+    volumes:
+      - ./data/immich:/data
+    secrets:
+      - IMMICH_DB_PASSWORD
+
+  # Search by content; needs a few GB of memory. Start it with --profile ml
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-v3.3.6}
+    profiles: [ ml ]
+    restart: unless-stopped
+    environment:
+      MACHINE_LEARNING_REQUEST_THREADS: 1
+    mem_limit: 4g
+    volumes:
+      - fgv_spexgram_immich_model_cache:/cache
+
+  immich-postgres:
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: immich
+      POSTGRES_DB: immich
+      POSTGRES_PASSWORD_FILE: /run/secrets/IMMICH_DB_PASSWORD
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    shm_size: 128mb
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U immich -d immich" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - fgv_spexgram_immich_postgres_data:/var/lib/postgresql/data
+    secrets:
+      - IMMICH_DB_PASSWORD
+
+  immich-valkey:
+    image: docker.io/valkey/valkey:9@sha256:c123e3715db63d06d4ad6964884037aa0d5d4d703939b9929954112889708e1d
+    restart: unless-stopped
+    healthcheck:
+      test: redis-cli ping | grep -q PONG || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  fgv_spexgram_mysql_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: .docker/fgv-spexgram-mysql/data
+      o: bind
+  fgv_spexgram_mysql_log:
+    driver: local
+    driver_opts:
+      type: none
+      device: .docker/fgv-spexgram-mysql/log
+      o: bind
+  fgv_spexgram_api_log:
+    driver: local
+    driver_opts:
+      type: none
+      device: .docker/fgv-spexgram-api/log_data
+      o: bind
+  fgv_spexgram_immich_postgres_data:
+  fgv_spexgram_immich_model_cache:
+
+networks:
+  fgv:
+    name: fgv-local
+    external: true
+
+secrets:
+  FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD:
+    file: .docker/secrets/FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD
+  FGV_SPEXGRAM_MYSQL_USER_PASSWORD:
+    file: .docker/secrets/FGV_SPEXGRAM_MYSQL_USER_PASSWORD
+  API_KEYCLOAK_ADMIN_CLIENT_SECRET:
+    file: .docker/secrets/API_KEYCLOAK_ADMIN_CLIENT_SECRET
+  API_KEYCLOAK_SERVICE_CLIENT_SECRET:
+    file: .docker/secrets/API_KEYCLOAK_SERVICE_CLIENT_SECRET
+  API_MEDIA_SIGNING_KEY:
+    file: .docker/secrets/API_MEDIA_SIGNING_KEY
+  API_IMMICH_ADMIN_PASSWORD:
+    file: .docker/secrets/API_IMMICH_ADMIN_PASSWORD
+  API_TURNSTILE_SECRET_KEY:
+    file: .docker/secrets/API_TURNSTILE_SECRET_KEY
+  IMMICH_DB_PASSWORD:
+    file: .docker/secrets/IMMICH_DB_PASSWORD

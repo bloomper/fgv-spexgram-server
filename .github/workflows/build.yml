@@ -1,0 +1,102 @@
+on:
+  push:
+    branches:
+      - develop
+    tags:
+      - 'v*'
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+  workflow_dispatch:
+    inputs:
+      git-ref:
+        description: Git Ref (optional)
+        required: false
+name: Build Workflow
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+jobs:
+  build-gradle-project:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project sources
+        uses: actions/checkout@v7
+        with:
+          # Disabling shallow clone is recommended for improving relevancy of reporting
+          fetch-depth: 0
+      - uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+      - name: Cache Gradle packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
+          restore-keys: ${{ runner.os }}-gradle
+      - name: Determine image tags
+        id: image
+        if: github.ref_type == 'tag' || github.ref_name == 'develop'
+        run: |
+          repo=bloomper/fgv-spexgram-server
+          sha=sha-${GITHUB_SHA::7}
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            echo "image=$repo:${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "tags=latest,$sha" >> "$GITHUB_OUTPUT"
+          else
+            echo "image=$repo:develop" >> "$GITHUB_OUTPUT"
+            echo "tags=$sha" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Verify release image does not exist
+        if: github.ref_type == 'tag'
+        run: |
+          if docker manifest inspect "${{ steps.image.outputs.image }}" > /dev/null 2>&1; then
+            echo "::error::${{ steps.image.outputs.image }} already exists on Docker Hub"
+            exit 1
+          fi
+      - name: Verify release tag matches project version
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(./gradlew -q properties --property version | awk '/^version:/ {print $2}')
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match project version $version"
+            exit 1
+          fi
+      # Lint, unit and integration tests on pull requests and pushes alike.
+      # Only this repository is checked out: the realm is the committed copy in src/integrationtest/resources.
+      # The sample data and the integration tests make videos with ffmpeg; Immich runs in Testcontainers
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Build and test
+        run: ./gradlew check
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: |
+            build/test-results/integrationTest/*.xml
+            build/test-results/test/*.xml
+      - name: Set up QEMU
+        if: steps.image.outputs.image
+        uses: docker/setup-qemu-action@v4
+      - name: Set up Docker Buildx
+        if: steps.image.outputs.image
+        uses: docker/setup-buildx-action@v4
+      - name: Log in to Docker Hub
+        if: steps.image.outputs.image
+        uses: docker/login-action@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Publish base image to Docker Hub
+        if: steps.image.outputs.image
+        run: docker buildx build --platform linux/amd64,linux/arm64 --pull --push --tag bloomper/fgv-spexgram-server-base:25 base
+      - name: Publish image to Docker Hub
+        if: steps.image.outputs.image
+        run: ./gradlew jib -Djib.to.image=${{ steps.image.outputs.image }} -Djib.to.tags=${{ steps.image.outputs.tags }} -Djib.to.auth.username=$DOCKERHUB_USERNAME -Djib.to.auth.password=$DOCKERHUB_TOKEN
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

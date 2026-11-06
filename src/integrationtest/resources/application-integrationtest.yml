@@ -1,0 +1,18 @@
+logging:
+  file:
+    path: ./build/integrationtest-data/log_data
+
+spexgram:
+  web-url: https://spexgram.test
+  media:
+    base-url: https://media.spexgram.test
+    # Not a real key: the tests check the signatures with it
+    signing-key: integration-test-signing-key
+    uploads: ./build/integrationtest-data/uploads
+  immich:
+    admin-password: integration-test-immich-password
+    keys-dir: ./build/integrationtest-data/immich-keys
+  turnstile:
+    secret-key: integration-test-turnstile-secret
+  mail:
+    from: noreply@spexgram.test

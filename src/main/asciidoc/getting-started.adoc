@@ -1,0 +1,282 @@
+= Spexgram Server
+:doctype: book
+:icons: font
+:source-highlighter: highlightjs
+:toc: left
+:toclevels: 4
+
+xref:index.adoc[Back to start page]
+
+[[prerequisites]]
+== Prerequisites
+
+You need to have the following installed to run Spexgram Server:
+
+* Docker
+
+You also need the following if you are to do development in Spexgram Server:
+
+* Git
+* Java
+** Version 25 is required, later versions might work as well
+* ffmpeg, on the path, for the sample data's videos when running the server outside Docker
+* An IDE of your choice
+
+[[cloning_the_repository]]
+== Cloning the repository
+
+Clone the Git repository into a folder ``spexgram`` next to fgv-infra-deploy and fgv-keycloak, as the other Spexgram repositories:
+
+[source,bash]
+----
+$ mkdir -p spexgram && cd spexgram
+$ git clone https://github.com/bloomper/fgv-spexgram-server
+$ git clone https://github.com/bloomper/fgv-spexgram-deploy
+----
+
+[[setup]]
+== Setup
+
+[[infrastructure]]
+=== Shared infrastructure
+
+Keycloak (with the realm ``fgv``), Mailpit, Umami and Caddy, which FGV's applications share, run in the local stack of https://github.com/bloomper/fgv-infra-deploy[fgv-infra-deploy], checked out two levels up (``../../fgv-infra-deploy`` from this repository).
+Start it once as its README describes; it keeps running for every application and creates the Docker network ``fgv-local``, which this repository's ``docker-compose.yaml`` joins.
+Keycloak imports the realm, with its clients and their secrets, from ``realm/fgv.json`` in https://github.com/bloomper/fgv-keycloak[fgv-keycloak].
+
+Spexgram reads spex from Spexregister, and its sample data is built on Spexregister's (see <<sample_data>>).
+Run https://github.com/bloomper/spexregister-server[spexregister-server]'s local stack as well, as its getting started guide describes.
+
+The media server's nginx configuration is ``media/default.conf.template`` in the sibling ``fgv-spexgram-deploy`` checkout (or where ``SPEXGRAM_DEPLOY`` points).
+
+[[configuration]]
+=== Configuration
+
+There are some configuration parameters that need to be set before Spexgram Server can be started.
+Each parameter is a file under ``.docker/secrets``, containing only the value.
+The files are in git with the placeholder ``CHANGE_ME``, as are the directories that ``docker-compose.yaml`` mounts (kept by ``.gitkeep``).
+Two scripts fill them in, once fgv-infra-deploy's local stack runs (see <<infrastructure>>):
+
+[source,bash]
+----
+$ ./scripts/init-secrets.sh          # random passwords and keys for every file still holding CHANGE_ME
+$ ./scripts/configure-keycloak.sh    # the Keycloak client secrets, read from the local Keycloak
+----
+
+Both keep the values that are already set, so they can be run again, and tell git to leave your values alone so they are never committed (``git update-index --skip-worktree .docker/secrets/*``).
+The database passwords take effect only when the databases are created, i.e. with empty data folders.
+To set a value by hand, write it without a trailing newline, e.g. ``printf '%s' 'verysecret' > .docker/secrets/FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD``.
+
+|===
+|Parameter|Purpose|Comment|Example value
+
+|FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD|The password for the root user of Spexgram Server's database||verysecret
+|FGV_SPEXGRAM_MYSQL_USER_PASSWORD|The password for the user of Spexgram Server's database||secret
+|API_KEYCLOAK_SERVICE_CLIENT_SECRET|The client secret of ``fgv-spexgram-service``, with which Spexgram Server calls Spexregister and reads editors' email addresses in Keycloak|Must match the value in ``realm/fgv.json`` in fgv-keycloak, search for ``fgv-spexgram-service`` and pick the value for ``secret`` in the same section|
+|API_KEYCLOAK_ADMIN_CLIENT_SECRET|The client secret of ``fgv-admin``, with which the sample data import gives users roles|Must match the value in ``realm/fgv.json``, search for ``fgv-admin``|
+|API_MEDIA_SIGNING_KEY|Signs the media addresses, which the media server checks; shared by ``spexgram-api`` and ``spexgram-media``|A long random string, e.g. from ``openssl rand -base64 32``|
+|API_IMMICH_ADMIN_PASSWORD|The password of Immich's admin, Spexgram's system user, which the API creates in Immich|A long random string|
+|IMMICH_DB_PASSWORD|The password of Immich's PostgreSQL|Letters and digits only|
+|API_TURNSTILE_SECRET_KEY|Cloudflare Turnstile's secret, for visitors' reports|Committed as Cloudflare's documented test secret ``1x0000000000000000000000000000000AA``, which accepts every token; keep it locally|
+
+|===
+
+There are also configuration parameters in ``.env`` that can be tweaked if so desired but the default values will work just fine.
+
+|===
+|Parameter|Purpose|Default value
+
+|FGV_SPEXGRAM_MYSQL_DATABASE|The name of the database used by Spexgram Server|spexgram
+|FGV_SPEXGRAM_MYSQL_ROOT_USER|The root user of Spexgram Server's database|root
+|FGV_SPEXGRAM_MYSQL_USER|The user of Spexgram Server's database|spexgram
+|API_KEYCLOAK_REALM|The Keycloak realm of Spexgram Server|fgv
+|API_KEYCLOAK_ADMIN_CLIENT_ID|The Keycloak admin client id of Spexgram Server|fgv-admin
+|API_KEYCLOAK_CLIENT_CLIENT_ID|The Keycloak client id of Spexgram Web|fgv-spexgram
+|API_IMPORT_SAMPLE_DATA|A flag determining whether to import sample data or not|false
+|API_SAMPLE_DATA_SIZE|``small`` (about 15 albums and 300 items) or ``large`` (about 300 albums and 20,000 items)|small
+|IMMICH_VERSION|The pinned Immich release|v3.3.6
+|SPEXGRAM_WEB_ORIGIN|The web origin the media server allows (CORS)|http://localhost:3004
+
+|===
+
+Access tokens are only accepted from the Keycloak clients ``fgv-spexgram`` and ``fgv-spexipedia-service`` (``API_SECURITY_AUTHORIZED_PARTIES``).
+
+Add the following to `/etc/hosts` (or the Windows equivalent):
+
+[source,bash]
+----
+###################################
+#            Spexgram             #
+###################################
+127.0.0.1 auth.fgv.local.nu
+127.0.0.1 api.spexgram.fgv.local.nu
+127.0.0.1 media.spexgram.fgv.local.nu
+127.0.0.1 spexgram.fgv.local.nu
+127.0.0.1 mail.fgv.local.nu
+127.0.0.1 analytics.fgv.local.nu
+----
+
+[[run]]
+== Run
+
+You are now ready to get Spexgram Server up and running, after fgv-infra-deploy's local stack:
+
+[source,bash]
+----
+$ docker compose -f ../../fgv-infra-deploy/local/compose.yaml up -d
+$ docker compose up -d                 # add --profile ml for search by content, which needs a few GB of memory
+----
+
+This starts MySQL, Immich (server, PostgreSQL and Valkey; machine learning with the profile ``ml``), the media server and ``spexgram-api``, which reaches Keycloak, Spexregister and Mailpit by their container names on the ``fgv-local`` network and Immich on the project's own network.
+At start the API sets Immich up: it creates Immich's admin, configures it and creates its three API keys in ``./data/immich-keys``, where the media server reads its own (see <<immich>>).
+Caddy serves the API on ``https://api.spexgram.fgv.local.nu:8443`` and the media server on ``https://media.spexgram.fgv.local.nu:8443``.
+MySQL, Immich and the media server are also published on localhost, on ports 3310, 2283 and 8086.
+
+When the ``spexgram-api`` container isn't running, Caddy forwards ``https://api.spexgram.fgv.local.nu:8443`` to port 8085 on the host, i.e. Spexgram Server started from the IDE or with ``./gradlew bootRun`` with the Spring profile ``local``, which reaches Immich on ``localhost:2283``, keeps its keys in ``./data/immich-keys`` and signs media addresses for ``http://localhost:8086``:
+
+[source,bash]
+----
+$ docker compose up -d spexgram-mysql immich-server
+$ MYSQL_API_USER_PASSWORD=<FGV_SPEXGRAM_MYSQL_USER_PASSWORD> \
+  API_KEYCLOAK_SERVICE_CLIENT_SECRET=<…> API_KEYCLOAK_ADMIN_CLIENT_SECRET=<…> API_MEDIA_SIGNING_KEY=<…> \
+  API_IMMICH_ADMIN_PASSWORD=<…> ./gradlew bootRun --args='--spring.profiles.active=local'
+$ docker compose up -d spexgram-media   # once the API has created data/immich-keys/media.key
+----
+
+The JVM must then trust Caddy's local root certificate (see <<caddy>>), since it reaches Keycloak at ``https://auth.fgv.local.nu:8443``.
+
+The realm lets a locally running https://github.com/bloomper/fgv-spexgram-web[fgv-spexgram-web], i.e. ``npm run dev``, log in from ``SPEXGRAM_URL`` in fgv-infra-deploy's ``local/.env``, which defaults to ``http://localhost:3004``.
+
+``./scripts/configure-keycloak.sh`` copies the secrets of the Keycloak clients the API uses from the local Keycloak into ``.docker/secrets``, sets the web client's id and secret (``KEYCLOAK_CLIENT_ID``, ``KEYCLOAK_CLIENT_SECRET``) in the ``.env.local`` of the web's checkout next to this one (or where ``WEB_DIR`` points), and allows Postman's callback URL in Keycloak (see <<testing_the_api>>).
+It finds fgv-infra-deploy in ``../../fgv-infra-deploy``, or where ``INFRA_DEPLOY`` points.
+
+The same setup for staging and production is in https://github.com/bloomper/fgv-spexgram-deploy[fgv-spexgram-deploy] and fgv-infra-deploy.
+
+[[immich]]
+== Immich
+
+The files live in Immich, a pinned release (``IMMICH_VERSION``), never in Spexgram's database.
+Spexgram Server talks to Immich's API with a hand-written client for the twenty-odd endpoints it uses (``immich/ImmichClient``), checked against the pinned version's OpenAPI document, ``src/main/resources/immich/immich-openapi-specs.json``, by ``ImmichClientContractTest``.
+To upgrade Immich, replace that document with the new release's ``open-api/immich-openapi-specs.json``, change ``IMMICH_VERSION`` in ``AbstractIntegrationTest``, ``docker-compose.yaml`` and fgv-spexgram-deploy, and run the tests.
+
+Immich's API keys are created by the API, since Immich makes their secrets itself: ``api.key`` (the API's), ``media.key`` (the media server's, read only) and ``bulk-import.key`` (upload only, for admins' bulk imports with Immich's command line tool).
+They are kept as files in ``spexgram.immich.keys-dir``; the media server mounts the folder read-only.
+A key that is missing, invalid (e.g. after Immich's database was replaced) or has other permissions is made again at the next start.
+
+Immich's web interface is not part of Spexgram; locally it is at http://localhost:2283, with the user ``spexgram@fgv.nu`` and the password in ``API_IMMICH_ADMIN_PASSWORD``.
+
+[[sample_data]]
+== Sample data
+
+If ``API_IMPORT_SAMPLE_DATA`` is set to ``true``, the database is replaced, the uploads folder emptied and every asset in Immich deleted at every start (it refuses in the Spring profile ``production``).
+Immich's system user and API keys are kept.
+None of the data can be traced to real individuals, i.e. no personally identifiable information (PII).
+The import needs the secret of ``fgv-admin``.
+
+The sample data is built on Spexregister's, so Spexregister must run with ``API_IMPORT_SAMPLE_DATA=true``:
+
+* The albums belong to Spexregister's sample spex, read from its API.
+The import waits up to 5 minutes for Spexregister.
+* Spexregister's sample users get roles on ``fgv-spexgram`` (see <<test_credentials>>).
+The import refuses to run without them, which keeps it away from real environments.
+
+[sidebar]
+.NOTE
+--
+Spexregister's import deletes all Keycloak users at every start, so restart Spexgram Server after Spexregister.
+--
+
+The import generates the files, never real photos: images with the album's title, a number and a coloured pattern (Java2D), with EXIF for the date taken, a position near Chalmers on every third and a rotation by metadata on every seventh, and every tenth as PNG; and videos made with ffmpeg: two in MP4, one in AVI that Immich must transcode, one longer than the maximum length, which is rejected once Immich knows its length, and a text file, which Immich rejects.
+HEIC is left out: ffmpeg, the only encoder in the image, cannot write it.
+They go through Immich's real upload and processing; with ``small`` the import waits until Immich has processed them.
+
+The archive has albums of every kind and visibility, with and without spex, captions and photographers with Swedish characters, a public item in an album for members, unpublished and trashed albums and items, contributions waiting for review and one accepted, a member's album suggestion, an open report, a handled one and a visitor's report, and unsorted items from two evenings.
+
+[[keycloak]]
+== Keycloak
+
+The administrative UI of Keycloak can be accessed at https://auth.fgv.local.nu:8443/auth.
+The username is ``KEYCLOAK_ADMIN`` in fgv-infra-deploy's ``local/.env`` and the password is in its ``local/.docker/secrets/KEYCLOAK_ADMIN_PASSWORD``.
+
+Spexgram uses the clients ``fgv-spexgram`` (the web, and Spexgram's roles ``USER``, ``EDITOR``, ``ADMIN`` and ``SPEXIPEDIA``), ``fgv-spexgram-service`` (Spexregister's ``MEDIA`` role, and ``realm-management``'s ``view-users`` for editors' email addresses) and ``fgv-admin`` (the sample data's users).
+
+The integration tests import a copy of ``fgv.json``.
+Refresh it with ``./gradlew syncRealm`` from the ``fgv-keycloak`` checkout two levels up after every realm change, and commit it.
+
+[[caddy]]
+== Caddy
+
+Caddy, in fgv-infra-deploy's local stack, serves Keycloak, Spexgram Server and the media server over HTTPS with certificates from its own CA.
+Import its root certificate, fgv-infra-deploy's ``local/.docker/caddy/data/caddy/pki/authorities/local/root.crt``, into your OS's trust manager.
+
+[[mailpit]]
+== Mailpit
+
+Mailpit, in fgv-infra-deploy's local stack, catches all emails: Spexgram Server's notifications to editors of reports, to reporters of outcomes and to contributors of reviews, and Keycloak's.
+The caught emails can be viewed at https://mail.fgv.local.nu:8443 (or http://localhost:8025).
+
+[[tests]]
+== Tests
+
+There are two types of tests:
+
+* Unit tests, located under ``src/test``, among them the API tests, which generate the xref:api-guide.adoc[HTTP API documentation]
+* Integration tests, located under ``src/integrationtest``
+
+Integration tests start MySQL, Keycloak and Immich (server, PostgreSQL and Valkey, without machine learning) with Testcontainers, so they need Docker, and use WireMock as a stand-in for Spexregister and Cloudflare Turnstile and GreenMail as the mail server.
+Uploads are processed by the real Immich.
+
+[source,bash]
+----
+$ ./gradlew test               # unit tests, also generates the snippets for the HTTP API documentation
+$ ./gradlew integrationTest
+$ ./gradlew check              # both, with compiler warnings as errors, and Jacoco
+$ ./gradlew build              # all of the above, plus this documentation
+----
+
+[[test_credentials]]
+== Test credentials
+
+The following test users have roles on ``fgv-spexgram`` when sample data is imported (see <<sample_data>>), with the password in ``SAMPLE_USER_PASSWORD`` (default ``s3cr3t-s3cr3t``, the same as Spexregister's).
+The first three are Spexregister's sample users, which are the same in every FGV application.
+
+|===
+|Username|Roles on ``fgv-spexgram``|Comment
+
+|admin@fgv.nu|``USER``, ``EDITOR``, ``ADMIN``|Uploaded the unsorted items
+|editor@fgv.nu|``USER``, ``EDITOR``|Uploaded the albums' items and has made the audit log's changes
+|user@fgv.nu|``USER``|Has contributions waiting for review and an accepted one, an album suggestion, an open and a handled report
+|no-access@fgv.nu|None|Created by the import when missing; sees what a visitor sees
+|(not logged in)|-|A visitor: public albums and items; a visitor's report from ``besokare@example.org`` is open
+
+|===
+
+[[testing_the_api]]
+== Testing the API
+
+There are many tools out there that can be used for manual testing of the APIs, e.g. Postman (https://www.postman.com/).
+The Keycloak client requires PKCE, so the tool must support it.
+
+To use Postman, first run ``./scripts/configure-keycloak.sh``, which allows Postman's callback URL in Keycloak.
+Then select ``OAuth 2.0`` as ``Auth Type`` under the ``Authorization`` tab and then select
+``Authorization Code (With PKCE)`` as ``Grant type`` and ``SHA-256`` as ``Code Challenge Method``.
+Enter values as follows (leave other fields empty).
+
+|===
+
+|Field|Value|Comment
+
+|Callback URL|https://oauth.pstmn.io/v1/browser-callback|
+|Auth URL|https://auth.fgv.local.nu:8443/auth/realms/fgv/protocol/openid-connect/auth|If ``API_KEYCLOAK_REALM`` in ``.env`` has been changed, the value must be changed accordingly
+|Access Token URL|https://auth.fgv.local.nu:8443/auth/realms/fgv/protocol/openid-connect/token|If ``API_KEYCLOAK_REALM`` in ``.env`` has been changed, the value must be changed accordingly
+|Client ID|fgv-spexgram|If ``API_KEYCLOAK_CLIENT_CLIENT_ID`` in ``.env`` has been changed, the value must be changed accordingly
+|Client Secret|The secret of ``fgv-spexgram`` in ``realm/fgv.json``|
+|Client Authentication|Send as Basic Auth header|
+
+|===
+
+Request an access token by clicking ``Get New Access Token`` and use any of the test credentials to login.
+Use the obtained access token when invoking the API, e.g. https://api.spexgram.fgv.local.nu:8443/api/graphql.
+Without a token the API answers as for a visitor.
+
+xref:index.adoc[Back to start page]

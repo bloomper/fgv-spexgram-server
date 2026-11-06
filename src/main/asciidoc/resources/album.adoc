@@ -1,0 +1,20 @@
+= Album
+:doctype: book
+:icons: font
+:source-highlighter: highlightjs
+:toc: left
+:toclevels: 4
+:operation-http-request-title: Example request
+:operation-http-response-title: Example response
+
+xref:../api-guide.adoc[Back to API guide]
+
+[[zip]]
+== Downloading an album as a zip
+
+The originals of the album's items the user may see, made into a zip by Immich and streamed through the API.
+Only for users who may download originals: `EDITOR` and `ADMIN`, and `USER` when admins allow it (`Limits.canDownloadOriginals`).
+
+operation::album-zip[snippets='security,path-parameters,request-headers,http-request,response-headers']
+
+xref:../api-guide.adoc[Back to API guide]
