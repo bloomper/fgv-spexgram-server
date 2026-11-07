@@ -128,7 +128,7 @@ $ docker compose up -d                 # add --profile ml for search by content,
 ----
 
 This starts MySQL, Immich (server, PostgreSQL and Valkey; machine learning with the profile ``ml``), the media server and ``spexgram-api``, which reaches Keycloak, Spexregister and Mailpit by their container names on the ``fgv-local`` network and Immich on the project's own network.
-At start the API sets Immich up: it creates Immich's admin, configures it and creates its three API keys in ``./data/immich-keys``, where the media server reads its own (see <<immich>>).
+At start the API sets Immich up: it creates Immich's admin, configures it and creates its three API keys in ``./data/immich-keys`` and, for the media server, ``./data/immich-media-key`` (see <<immich>>).
 Caddy serves the API on ``https://api.spexgram.fgv.local.nu:8443`` and the media server on ``https://media.spexgram.fgv.local.nu:8443``.
 MySQL, Immich and the media server are also published on localhost, on ports 3310, 2283 and 8086.
 
@@ -140,7 +140,7 @@ $ docker compose up -d spexgram-mysql immich-server
 $ MYSQL_API_USER_PASSWORD=<FGV_SPEXGRAM_MYSQL_USER_PASSWORD> \
   API_KEYCLOAK_SERVICE_CLIENT_SECRET=<…> API_KEYCLOAK_ADMIN_CLIENT_SECRET=<…> API_MEDIA_SIGNING_KEY=<…> \
   API_IMMICH_ADMIN_PASSWORD=<…> ./gradlew bootRun --args='--spring.profiles.active=local'
-$ docker compose up -d spexgram-media   # once the API has created data/immich-keys/media.key
+$ docker compose up -d spexgram-media   # once the API has created data/immich-media-key/media.key
 ----
 
 The JVM must then trust Caddy's local root certificate (see <<caddy>>), since it reaches Keycloak at ``https://auth.fgv.local.nu:8443``.
@@ -160,7 +160,7 @@ Spexgram Server talks to Immich's API with a hand-written client for the twenty-
 To upgrade Immich, replace that document with the new release's ``open-api/immich-openapi-specs.json``, change ``IMMICH_VERSION`` in ``AbstractIntegrationTest``, ``docker-compose.yaml`` and fgv-spexgram-deploy, and run the tests.
 
 Immich's API keys are created by the API, since Immich makes their secrets itself: ``api.key`` (the API's), ``media.key`` (the media server's, read only) and ``bulk-import.key`` (upload only, for admins' bulk imports with Immich's command line tool).
-They are kept as files in ``spexgram.immich.keys-dir``; the media server mounts the folder read-only.
+They are kept as files in ``spexgram.immich.keys-dir`` (``API_IMMICH_KEYS_DIR``), except ``media.key``, which is kept alone in ``spexgram.immich.media-key-dir`` (``API_IMMICH_MEDIA_KEY_DIR``): the media server mounts only that folder, read-only, and never sees the API's own key.
 A key that is missing, invalid (e.g. after Immich's database was replaced) or has other permissions is made again at the next start.
 
 Immich's web interface is not part of Spexgram; locally it is at http://localhost:2283, with the user ``spexgram@fgv.nu`` and the password in ``API_IMMICH_ADMIN_PASSWORD``.
@@ -237,7 +237,7 @@ $ ./gradlew build              # all of the above, plus this documentation
 [[test_credentials]]
 == Test credentials
 
-The following test users have roles on ``fgv-spexgram`` when sample data is imported (see <<sample_data>>), with the password in ``SAMPLE_USER_PASSWORD`` (default ``s3cr3t-s3cr3t``, the same as Spexregister's).
+The following test users have roles on ``fgv-spexgram`` when sample data is imported (see <<sample_data>>), with the password in ``SAMPLE_USER_PASSWORD`` (``s3cr3t-s3cr3t`` in the ``local`` profile, the same as Spexregister's; every other environment must set it).
 The first three are Spexregister's sample users, which are the same in every FGV application.
 
 |===

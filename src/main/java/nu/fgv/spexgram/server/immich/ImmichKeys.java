@@ -31,9 +31,11 @@ import java.util.Optional;
 
 /**
  * Immich's three API keys, each with only the permissions it needs (section 8 of the spec), kept as files in
- * {@code spexgram.immich.keys-dir}. Immich makes a key's secret and shows it only once, so the API creates the keys
- * ({@link ImmichBootstrap}) and hands them over through this folder: the media server mounts it read-only and reads
- * {@code media.key}; admins read {@code bulk-import.key} on the host for Immich's command line tool.
+ * {@code spexgram.immich.keys-dir}, except the media server's {@code media.key}, which is kept in a folder of its own,
+ * {@code spexgram.immich.media-key-dir}. Immich makes a key's secret and shows it only once, so the API creates the keys
+ * ({@link ImmichBootstrap}) and hands them over through these folders: the media server mounts only the media key's
+ * folder, read-only, so it never sees the API's full key; admins read {@code bulk-import.key} on the host for Immich's
+ * command line tool.
  *
  * @author Anders Jacobsson
  * @since 1.0
@@ -42,10 +44,19 @@ import java.util.Optional;
 public class ImmichKeys {
 
     private final Path folder;
+    private final Path mediaFolder;
     private volatile @Nullable String apiKey;
 
     public ImmichKeys(final SpexgramProperties properties) {
         this.folder = properties.immich().keysDir();
+        this.mediaFolder = properties.immich().mediaKeyDir() == null ? folder : properties.immich().mediaKeyDir();
+    }
+
+    /**
+     * The folder a key is kept in: the media server's in a folder of its own, which is all the media server mounts.
+     */
+    Path folderOf(final Purpose purpose) {
+        return purpose == Purpose.MEDIA ? mediaFolder : folder;
     }
 
     /**
@@ -71,7 +82,7 @@ public class ImmichKeys {
     }
 
     Optional<String> read(final Purpose purpose) throws IOException {
-        final Path file = folder.resolve(purpose.fileName());
+        final Path file = folderOf(purpose).resolve(purpose.fileName());
 
         if (!Files.isRegularFile(file)) {
             return Optional.empty();
@@ -86,12 +97,18 @@ public class ImmichKeys {
      * Writes the key by replacing the file, so that a reader never sees half a key.
      */
     void write(final Purpose purpose, final String key) throws IOException {
-        Files.createDirectories(folder);
+        final Path target = folderOf(purpose);
 
-        final Path temporary = Files.createTempFile(folder, purpose.fileName(), ".tmp");
+        Files.createDirectories(target);
+
+        final Path temporary = Files.createTempFile(target, purpose.fileName(), ".tmp");
 
         Files.writeString(temporary, key, StandardCharsets.UTF_8);
-        Files.move(temporary, folder.resolve(purpose.fileName()), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        Files.move(temporary, target.resolve(purpose.fileName()), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        if (!target.equals(folder)) {
+            // A copy left from when every key was kept together, now replaced and no longer valid in Immich
+            Files.deleteIfExists(folder.resolve(purpose.fileName()));
+        }
     }
 
     /**

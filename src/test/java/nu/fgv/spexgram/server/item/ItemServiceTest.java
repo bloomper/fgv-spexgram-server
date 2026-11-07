@@ -28,6 +28,7 @@ import nu.fgv.spexgram.server.visibility.Visibility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
@@ -38,6 +39,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static nu.fgv.spexgram.server.util.TestUuids.uuid;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -113,11 +115,21 @@ class ItemServiceTest {
     void anAlbumsCountResolvesAsSpexipediaForItsServiceAccount() {
         final Album album = album(1);
 
-        when(albumRepository.findByUuid(album.getUuid())).thenReturn(Optional.of(album));
-        when(repository.count(ItemServiceTest.<Specification<Item>>anySpec())).thenReturn(3L);
+        when(albumRepository.findByUuidIn(List.of(album.getUuid()))).thenReturn(List.of(album));
+        when(repository.countByAlbum(ItemServiceTest.<Specification<Item>>anySpec(), eq(List.of(album)))).thenReturn(Map.of(album.getId(), 3L));
 
         assertThat(service.itemCounts(List.of(album.getUuid()))).isEqualTo(Map.of(album.getUuid(), 3));
         verify(viewerService, never()).current();
+    }
+
+    @Test
+    void albumsWithoutVisibleItemsCountZeroAndUnknownOnesAreLeftOut() {
+        final Album album = album(1);
+
+        when(albumRepository.findByUuidIn(List.of(album.getUuid(), uuid(99)))).thenReturn(List.of(album));
+        when(repository.countByAlbum(ItemServiceTest.<Specification<Item>>anySpec(), eq(List.of(album)))).thenReturn(Map.of());
+
+        assertThat(service.itemCounts(List.of(album.getUuid(), uuid(99)))).isEqualTo(Map.of(album.getUuid(), 0));
     }
 
     @Test
@@ -127,14 +139,30 @@ class ItemServiceTest {
         final Item first = item(8, album);
 
         album.setCoverItemId(moved.getId());
-        when(albumRepository.findByUuid(album.getUuid())).thenReturn(Optional.of(album));
-        when(repository.findById(moved.getId())).thenReturn(Optional.of(moved));
-        when(repository.findAll(ItemServiceTest.<Specification<Item>>anySpec(), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(first)));
+        when(albumRepository.findByUuidIn(List.of(album.getUuid()))).thenReturn(List.of(album));
+        when(repository.findAllById(Set.of(moved.getId()))).thenReturn(List.of(moved));
+        when(repository.firstByAlbum(ItemServiceTest.<Specification<Item>>anySpec(), eq(List.of(album)))).thenReturn(Map.of(album.getId(), first.getId()));
+        when(repository.findAllById(List.of(first.getId()))).thenReturn(List.of(first));
 
-        service.cover(album.getUuid());
+        assertThat(service.covers(List.of(album.getUuid()))).containsOnlyKeys(album.getUuid());
 
-        verify(views).toDto(eq(first), eq(SPEXIPEDIA));
+        verify(views).toDto(eq(first), ArgumentMatchers.<ItemViews.Context>any());
         verify(viewerService, never()).current();
+    }
+
+    @Test
+    void aVisibleChosenCoverIsUsedWithoutLookingForTheFirstItem() {
+        final Album album = album(1);
+        final Item chosen = item(7, album);
+
+        album.setCoverItemId(chosen.getId());
+        when(albumRepository.findByUuidIn(List.of(album.getUuid()))).thenReturn(List.of(album));
+        when(repository.findAllById(Set.of(chosen.getId()))).thenReturn(List.of(chosen));
+        when(repository.firstByAlbum(ItemServiceTest.<Specification<Item>>anySpec(), eq(List.of()))).thenReturn(Map.of());
+
+        assertThat(service.covers(List.of(album.getUuid()))).containsOnlyKeys(album.getUuid());
+
+        verify(views).toDto(eq(chosen), ArgumentMatchers.<ItemViews.Context>any());
     }
 
     @Test

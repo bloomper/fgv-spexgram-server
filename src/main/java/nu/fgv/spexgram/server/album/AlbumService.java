@@ -76,7 +76,10 @@ import java.util.stream.Collectors;
 public class AlbumService {
 
     static final int MAX_SPEX = 10;
-    static final int MAX_PAGE = 200;
+    /** The largest page of albums for visitors and members; with up to 100 items each, a query stays bounded. */
+    static final int MAX_PAGE = 50;
+    /** The largest page for editors, whose album pickers list every album. */
+    static final int MAX_EDITOR_PAGE = 500;
     private static final int MAX_TEXT = 255;
     private static final Sort NEWEST_FIRST = Sort.by(Sort.Order.desc("dateFrom").nullsLast(), Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
 
@@ -183,11 +186,15 @@ public class AlbumService {
 
     // ---------------------------------------------------------------------------------------------- reading
 
+    private static int maxPage(final Viewer viewer) {
+        return viewer.isEditor() ? MAX_EDITOR_PAGE : MAX_PAGE;
+    }
+
     @Transactional(readOnly = true)
     public AlbumPage albums(final @Nullable AlbumFilter filter, final int page, final int size) {
         final Viewer viewer = viewerService.current();
         final int p = Math.max(page, 0);
-        final int s = Math.clamp(size, 1, MAX_PAGE);
+        final int s = Math.clamp(size, 1, maxPage(viewer));
         final Page<Album> albums = repository.findAll(filtered(filter, viewer), PageRequest.of(p, s, NEWEST_FIRST));
 
         return new AlbumPage(albums.getContent().stream().map(AlbumService::toDto).toList(), albums.getTotalElements(), p, s);
@@ -205,7 +212,7 @@ public class AlbumService {
         final Viewer viewer = viewerService.current();
 
         return repository.findAll(ItemSpecifications.albumsVisibleTo(viewer),
-                        PageRequest.of(0, Math.clamp(limit, 1, MAX_PAGE), Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))))
+                        PageRequest.of(0, Math.clamp(limit, 1, maxPage(viewer)), Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))))
                 .stream().map(AlbumService::toDto).toList();
     }
 

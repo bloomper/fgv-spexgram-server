@@ -132,7 +132,7 @@ class UploadIntegrationTest extends AbstractIntegrationTest {
         final byte[] played = RestClient.builder().baseUrl(immichUrl())
                 .requestFactory(new JdkClientHttpRequestFactory(HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()))
                 .build().get().uri("/api/assets/{id}/video/playback", asset)
-                .header(ImmichClient.API_KEY_HEADER, Files.readString(DATA.resolve("immich-keys/media.key")))
+                .header(ImmichClient.API_KEY_HEADER, Files.readString(DATA.resolve("immich-media-key/media.key")))
                 .retrieve().body(byte[].class);
 
         final Path playedFile = folder.resolve("spelad.mp4");

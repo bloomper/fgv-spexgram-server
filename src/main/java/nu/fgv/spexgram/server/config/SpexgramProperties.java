@@ -16,6 +16,7 @@
 
 package nu.fgv.spexgram.server.config;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.unit.DataSize;
 
@@ -75,11 +76,13 @@ public record SpexgramProperties(String timeZone,
      * @param url           Immich on the internal network, e.g. {@code http://immich-server:2283}
      * @param adminEmail    the email of Immich's admin, Spexgram's system user
      * @param adminPassword its password, from the deployment's secrets
-     * @param keysDir       where the API keys are kept; the media server reads its key from there
+     * @param keysDir       where the API's and the bulk import's API keys are kept
+     * @param mediaKeyDir   where the media server's read-only key ({@code media.key}) is kept, alone, so that the media
+     *                      server mounts only it; the keys folder when not set
      * @param clipModel     the multilingual CLIP model for search by content
      * @param startupWait   how long the API waits for Immich at start before it keeps trying in the background
      */
-    public record Immich(String url, String adminEmail, String adminPassword, Path keysDir, String clipModel,
+    public record Immich(String url, String adminEmail, String adminPassword, Path keysDir, @Nullable Path mediaKeyDir, String clipModel,
                          Duration startupWait) {
     }
 

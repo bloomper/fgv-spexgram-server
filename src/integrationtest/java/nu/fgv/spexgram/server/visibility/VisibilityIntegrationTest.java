@@ -80,6 +80,32 @@ class VisibilityIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void eachAlbumOfAPageGetsTheCoverTheViewerMaySee() throws Exception {
+        final String first = createAlbum("PUBLIC");
+        final String second = createAlbum("PUBLIC");
+        final List<String> firstItems = readyPhotos(first, folder, "Första", "Andra", "Tredje");
+        final List<String> secondItems = readyPhotos(second, folder, "Ensam");
+
+        setItemVisibility(firstItems.get(1), "PUBLIC");
+        setItemVisibility(firstItems.get(2), "PUBLIC");
+        setItemVisibility(secondItems.getFirst(), "PUBLIC");
+        // The chosen cover is for members only, so visitors get the album's first public item instead
+        graphQl(EDITOR).document("mutation($id: ID!, $item: ID) { albumSetCover(id: $id, itemId: $item) { id } }")
+                .variables(Map.of("id", first, "item", firstItems.getFirst())).execute().errors().verify();
+
+        graphQl(EDITOR)
+                .document("query($id: ID!) { album(id: $id) { cover { id } } }")
+                .variable("id", first)
+                .execute()
+                .path("album.cover.id").entity(String.class).isEqualTo(firstItems.getFirst());
+        graphQl(null)
+                .document("{ albums { albums { id cover { id } } } }")
+                .execute()
+                // Newest first
+                .path("albums.albums[*].cover.id").entityList(String.class).containsExactly(secondItems.getFirst(), firstItems.get(1));
+    }
+
+    @Test
     void aPublicItemInAnAlbumForMembersIsReachableByIdButTheAlbumIsNotListed() throws Exception {
         final String album = createAlbum("MEMBERS");
         final List<String> items = readyPhotos(album, folder, "Gruppbild", "Repetition");

@@ -73,7 +73,10 @@ import java.util.stream.Collectors;
 @Service
 public class ItemService {
 
-    static final int MAX_PAGE = 500;
+    /** The largest page of an album's items, for visitors and members, who may ask for one per album of a page. */
+    static final int MAX_PAGE = 100;
+    /** The largest page for editors, whose album page lists every item at once. */
+    static final int MAX_EDITOR_PAGE = 500;
     static final int MAX_IDS = 200;
     static final int MAX_BULK = 1000;
     private static final int MAX_TEXT = 255;
@@ -190,7 +193,7 @@ public class ItemService {
         final Album album = albumRepository.findByUuid(albumId).filter(found -> ItemViews.canSee(found, viewer))
                 .orElseThrow(() -> new ResourceNotFoundException(Album.class, albumId));
         final int p = Math.max(page, 0);
-        final int s = Math.clamp(size, 1, MAX_PAGE);
+        final int s = Math.clamp(size, 1, viewer.isEditor() ? MAX_EDITOR_PAGE : MAX_PAGE);
         // Editors open trashed albums to restore them, so their items are listed there too
         final Specification<Item> visible = viewer.isEditor() && album.isTrashed()
                 ? (root, query, builder) -> builder.isNull(root.get("trashedAt"))
@@ -206,35 +209,58 @@ public class ItemService {
     @Transactional(readOnly = true)
     public Map<UUID, Integer> itemCounts(final Collection<UUID> albumIds) {
         final Viewer viewer = viewerService.currentForSpexipedia();
+        final List<Album> albums = albumIds.isEmpty() ? List.of() : albumRepository.findByUuidIn(albumIds);
+        // One query for the whole page of albums, which visitors can ask for 50 at a time (editors 500)
+        final Map<Long, Long> byId = repository.countByAlbum(ItemSpecifications.visibleTo(viewer), albums);
         final Map<UUID, Integer> counts = new HashMap<>();
 
-        for (final UUID albumId : albumIds) {
-            albumRepository.findByUuid(albumId).ifPresent(album ->
-                    counts.put(albumId, (int) repository.count(ItemSpecifications.visibleTo(viewer).and(inAlbum(album)))));
-        }
+        albums.forEach(album -> counts.put(album.getUuid(), byId.getOrDefault(album.getId(), 0L).intValue()));
         return counts;
     }
 
     /**
-     * The cover of an album: the chosen one if the viewer may see it, else the first item they may see.
+     * The covers of albums: the chosen one if the viewer may see it, else the first item they may see. A fixed number
+     * of queries for any number of albums; albums without a cover are left out.
      */
     @Transactional(readOnly = true)
-    public @Nullable ItemDto cover(final UUID albumId) {
+    public Map<UUID, ItemDto> covers(final Collection<UUID> albumIds) {
         final Viewer viewer = viewerService.currentForSpexipedia();
-        final Album album = albumRepository.findByUuid(albumId).orElse(null);
+        final List<Album> albums = albumIds.isEmpty() ? List.of() : albumRepository.findByUuidIn(albumIds);
+        final Map<Long, Item> covers = new HashMap<>();
+        final Set<Long> chosenIds = albums.stream().map(Album::getCoverItemId).filter(Objects::nonNull).collect(Collectors.toSet());
 
-        if (album == null) {
-            return null;
+        if (!chosenIds.isEmpty()) {
+            final Map<Long, Album> byCover = new HashMap<>();
+
+            albums.stream().filter(album -> album.getCoverItemId() != null).forEach(album -> byCover.put(album.getCoverItemId(), album));
+            repository.findAllById(chosenIds).stream()
+                    .filter(item -> {
+                        final Album album = byCover.get(item.getId());
+
+                        return album != null && item.getAlbum() != null && item.getAlbum().getId().equals(album.getId());
+                    })
+                    .filter(item -> ItemViews.canSee(item, viewer) && !item.isTrashed() && item.getStatus() == ItemStatus.READY)
+                    .forEach(item -> covers.put(item.getAlbum().getId(), item));
         }
 
-        final Specification<Item> visible = ItemSpecifications.visibleTo(viewer).and(inAlbum(album));
-        final Item chosen = album.getCoverItemId() == null ? null : repository.findById(album.getCoverItemId())
-                .filter(item -> item.getAlbum() != null && item.getAlbum().getId().equals(album.getId()))
-                .filter(item -> ItemViews.canSee(item, viewer) && !item.isTrashed() && item.getStatus() == ItemStatus.READY)
-                .orElse(null);
-        final Item cover = chosen != null ? chosen : repository.findAll(visible, PageRequest.of(0, 1, BY_TAKEN)).stream().findFirst().orElse(null);
+        final List<Album> withoutChosen = albums.stream().filter(album -> !covers.containsKey(album.getId())).toList();
+        final Map<Long, Long> firstIds = repository.firstByAlbum(ItemSpecifications.visibleTo(viewer), withoutChosen);
 
-        return cover == null ? null : views.toDto(cover, viewer);
+        if (!firstIds.isEmpty()) {
+            repository.findAllById(List.copyOf(firstIds.values())).forEach(item -> covers.put(item.getAlbum().getId(), item));
+        }
+
+        final ItemViews.Context context = views.context(viewer);
+        final Map<UUID, ItemDto> result = new HashMap<>();
+
+        albums.forEach(album -> {
+            final Item cover = covers.get(album.getId());
+
+            if (cover != null) {
+                result.put(album.getUuid(), views.toDto(cover, context));
+            }
+        });
+        return result;
     }
 
     /**

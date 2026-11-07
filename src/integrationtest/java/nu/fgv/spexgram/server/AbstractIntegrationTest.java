@@ -292,22 +292,31 @@ public abstract class AbstractIntegrationTest {
      * A user's access token from {@code fgv-spexgram}, by password grant.
      */
     protected static String token(final String user) {
-        return TOKENS.computeIfAbsent(user, _ -> {
-            final MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        return TOKENS.computeIfAbsent(user, _ -> "Bearer " + tokens(user).get("access_token"));
+    }
 
-            Map.of("grant_type", "password", "client_id", CLIENT_ID, "client_secret", SECRETS.get(CLIENT_ID),
-                    "username", user, "password", PASSWORD, "scope", "openid").forEach(form::add);
+    /**
+     * A user's ID token from {@code fgv-spexgram}, which the API must refuse in place of an access token.
+     */
+    protected static String idToken(final String user) {
+        return "Bearer " + tokens(user).get("id_token");
+    }
 
-            final String response = RestClient.create()
-                    .post()
-                    .uri(KEYCLOAK.getAuthServerUrl() + "/realms/" + REALM + "/protocol/openid-connect/token")
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body(form)
-                    .retrieve()
-                    .body(String.class);
+    private static Map<String, Object> tokens(final String user) {
+        final MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
 
-            return "Bearer " + JSON.parseMap(response).get("access_token");
-        });
+        Map.of("grant_type", "password", "client_id", CLIENT_ID, "client_secret", SECRETS.get(CLIENT_ID),
+                "username", user, "password", PASSWORD, "scope", "openid").forEach(form::add);
+
+        final String response = RestClient.create()
+                .post()
+                .uri(KEYCLOAK.getAuthServerUrl() + "/realms/" + REALM + "/protocol/openid-connect/token")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(form)
+                .retrieve()
+                .body(String.class);
+
+        return JSON.parseMap(response);
     }
 
     /**
