@@ -115,8 +115,8 @@ class ReportIntegrationTest extends AbstractIntegrationTest {
         expectError(graphQl(null).document(REPORT)
                 .variable("input", Map.of("itemId", item, "reason", "OTHER", "email", "a@example.org", "turnstileToken", "elsewhere"))
                 .execute(), "BAD_REQUEST");
-        // The same address, at most five an hour (the refused one above counts)
-        for (int i = 0; i < 4; i++) {
+        // The same address, at most five an hour; a refused Turnstile check, like the one above, does not count
+        for (int i = 0; i < 5; i++) {
             graphQl(null).document(REPORT)
                     .variable("input", Map.of("itemId", item, "reason", "OTHER", "email", "a@example.org", "turnstileToken", "ok"))
                     .execute().errors().verify();

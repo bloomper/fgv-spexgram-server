@@ -14,11 +14,11 @@ type Query {
     limits: Limits!
     "ADMIN."
     settings: Settings!
-    "Anyone. Albums the viewer may see, newest first; every album outside the trash for EDITOR."
+    "Anyone. Albums the viewer may see, newest first; every album outside the trash for EDITOR. At most 50 a page (500 for EDITOR)."
     albums(filter: AlbumFilter, page: Int = 0, size: Int = 50): AlbumPage!
     "Anyone. An album the viewer may see, else null (whether it exists is not told)."
     album(id: ID!): Album
-    "Anyone. The most recently added albums the viewer may see."
+    "Anyone. The most recently added albums the viewer may see, at most 50 (500 for EDITOR)."
     recentAlbums(limit: Int = 12): [Album!]!
     "Anyone. An item the viewer may see, else null. A public item is reachable here even in an album for members."
     item(id: ID!): Item
@@ -253,7 +253,7 @@ type Album {
     cover: Item
     "Items the viewer may see."
     itemCount: Int!
-    "Items the viewer may see, by when they were taken; for EDITOR also processing, failed and unpublished ones, and for a contributor their own waiting for review."
+    "Items the viewer may see, by when they were taken; for EDITOR also processing, failed and unpublished ones, and for a contributor their own waiting for review. At most 100 a page (500 for EDITOR)."
     items(page: Int = 0, size: Int = 100): ItemPage!
     "EDITOR. How many items outside the trash have each visibility of their own, e.g. to tell how many become public."
     visibilityCounts: [VisibilityCount!]!

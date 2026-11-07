@@ -114,8 +114,10 @@ spexgram:
     url: ${API_IMMICH_URL:http://localhost:2283}
     admin-email: ${API_IMMICH_ADMIN_EMAIL:spexgram@fgv.nu}
     admin-password: ${API_IMMICH_ADMIN_PASSWORD:}
-    # The media server mounts this folder read-only for its key
+    # The API's and the bulk import's keys
     keys-dir: ${API_IMMICH_KEYS_DIR:./data/immich-keys}
+    # The media server's read-only key alone, so that the media server mounts only this folder, read-only
+    media-key-dir: ${API_IMMICH_MEDIA_KEY_DIR:./data/immich-media-key}
     # Multilingual, and understands Swedish and English queries without being told the language
     clip-model: ${API_IMMICH_CLIP_MODEL:ViT-L-16-SigLIP2-256__webli}
     startup-wait: 2m
@@ -129,7 +131,8 @@ spexgram:
   data:
     import-sample-data: ${API_IMPORT_SAMPLE_DATA:false}
     sample-data-size: ${API_SAMPLE_DATA_SIZE:small}
-    sample-user-password: ${SAMPLE_USER_PASSWORD:s3cr3t-s3cr3t}
+    # Needed only to import sample data; the local profile has a development value
+    sample-user-password: ${SAMPLE_USER_PASSWORD:}
 
 ---
 spring:
@@ -156,6 +159,9 @@ management:
     port: 9005
 
 spexgram:
+  data:
+    # For development only; every other environment sets SAMPLE_USER_PASSWORD
+    sample-user-password: ${SAMPLE_USER_PASSWORD:s3cr3t-s3cr3t}
   keycloak:
     url: https://auth.fgv.local.nu:8443/auth
   media:

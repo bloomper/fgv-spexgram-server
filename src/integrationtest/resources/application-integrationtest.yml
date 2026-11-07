@@ -3,6 +3,8 @@ logging:
     path: ./build/integrationtest-data/log_data
 
 spexgram:
+  data:
+    sample-user-password: s3cr3t-s3cr3t
   web-url: https://spexgram.test
   media:
     base-url: https://media.spexgram.test
@@ -12,6 +14,7 @@ spexgram:
   immich:
     admin-password: integration-test-immich-password
     keys-dir: ./build/integrationtest-data/immich-keys
+    media-key-dir: ./build/integrationtest-data/immich-media-key
   turnstile:
     secret-key: integration-test-turnstile-secret
   mail:

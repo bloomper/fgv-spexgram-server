@@ -137,6 +137,10 @@ public class SearchService {
         final Viewer viewer = viewerService.current();
 
         viewer.requireMember();
+        if (q.isBlank()) {
+            // Immich refuses an empty query, which would read as Immich being unavailable
+            return List.of();
+        }
 
         final int max = Math.clamp(limit, 1, MAX_LIMIT);
         final Set<Long> albums = filter == null ? null : albumService.albumIds(filter, viewer);

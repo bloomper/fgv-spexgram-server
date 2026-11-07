@@ -153,11 +153,13 @@ public class ReportService {
             if (email == null || email.length() > MAX_EMAIL || !EMAIL.matcher(email).matches()) {
                 throw new BadRequestException("error.report.email");
             }
-            if (!limiter.tryAcquire(clientIp, email)) {
-                throw new BadRequestException("error.report.tooMany");
-            }
+            // Turnstile first: only a passed check counts against the limits, so that nobody can use up a visitor's (or,
+            // without the web's address, every visitor's) reports for the hour without passing it
             if (input.turnstileToken() == null || !turnstile.verify(input.turnstileToken())) {
                 throw new BadRequestException("error.report.turnstile");
+            }
+            if (!limiter.tryAcquire(clientIp, email)) {
+                throw new BadRequestException("error.report.tooMany");
             }
         }
 

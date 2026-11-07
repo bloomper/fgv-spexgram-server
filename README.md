@@ -30,8 +30,8 @@ permission and configuration field the API relies on is in it. To upgrade, repla
 fgv-spexgram-deploy, and run the tests.
 
 Immich creates an API key's secret itself, so the API creates its three keys at start (its own, the media server's
-read-only one and an upload-only one for bulk imports) and keeps them as files in `API_IMMICH_KEYS_DIR`, a folder the
-media server mounts read-only.
+read-only one and an upload-only one for bulk imports) and keeps them as files: the API's and the bulk import's in `API_IMMICH_KEYS_DIR`, the media server's alone in
+`API_IMMICH_MEDIA_KEY_DIR`, the only folder the media server mounts (read-only), so it never sees the API's full key.
 
 Known: Immich's previews (what visitors download) carry no position or other EXIF; the checked preview of a JPEG with
 GPS had none.

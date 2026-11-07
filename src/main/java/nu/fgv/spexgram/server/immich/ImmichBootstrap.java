@@ -187,6 +187,6 @@ public class ImmichBootstrap {
             }
         }
         keys.write(purpose, client.createApiKey(token, purpose.keyName(), purpose.permissions()));
-        log.info("Created Immich's API key {} in {}", purpose.keyName(), properties.keysDir());
+        log.info("Created Immich's API key {} in {}", purpose.keyName(), keys.folderOf(purpose));
     }
 }

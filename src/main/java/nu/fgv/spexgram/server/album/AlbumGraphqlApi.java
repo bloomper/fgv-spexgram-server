@@ -104,9 +104,13 @@ public class AlbumGraphqlApi {
         return spexService.search(q);
     }
 
-    @SchemaMapping(typeName = "Album", field = "cover")
-    public @Nullable ItemDto cover(final AlbumDto album) {
-        return itemService.cover(album.id());
+    @BatchMapping(typeName = "Album", field = "cover")
+    public Map<AlbumDto, @Nullable ItemDto> cover(final List<AlbumDto> albums) {
+        final Map<UUID, ItemDto> covers = itemService.covers(albums.stream().map(AlbumDto::id).toList());
+        final Map<AlbumDto, @Nullable ItemDto> result = new LinkedHashMap<>();
+
+        albums.forEach(album -> result.put(album, covers.get(album.id())));
+        return result;
     }
 
     @BatchMapping(typeName = "Album", field = "itemCount")

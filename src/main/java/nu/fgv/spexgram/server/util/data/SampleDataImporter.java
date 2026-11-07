@@ -68,6 +68,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.FileSystemUtils;
+import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -363,6 +364,9 @@ public class SampleDataImporter {
         final UserRepresentation user = new UserRepresentation();
 
         credential.setType(CredentialRepresentation.PASSWORD);
+        if (!StringUtils.hasText(properties.data().sampleUserPassword())) {
+            throw new IllegalStateException("SAMPLE_USER_PASSWORD must be set to import sample data");
+        }
         credential.setValue(properties.data().sampleUserPassword());
         credential.setTemporary(false);
         user.setUsername(NO_ACCESS);

@@ -99,8 +99,12 @@ public class ItemGraphqlApi {
         final Map<UUID, AlbumRef> albums = new HashMap<>();
         final Map<ItemDto, @Nullable AlbumRef> result = new LinkedHashMap<>();
 
-        items.stream().map(ItemDto::albumId).filter(Objects::nonNull).distinct().forEach(id ->
-                albumRepository.findByUuid(id).ifPresent(album -> albums.put(id, new AlbumRef(album.getUuid(), album.getTitle(), album.getVisibility()))));
+        final List<UUID> ids = items.stream().map(ItemDto::albumId).filter(Objects::nonNull).distinct().toList();
+
+        // One query for every album of the page of items, not one per album
+        if (!ids.isEmpty()) {
+            albumRepository.findByUuidIn(ids).forEach(album -> albums.put(album.getUuid(), new AlbumRef(album.getUuid(), album.getTitle(), album.getVisibility())));
+        }
         items.forEach(item -> result.put(item, item.albumId() == null ? null : albums.get(item.albumId())));
         return result;
     }

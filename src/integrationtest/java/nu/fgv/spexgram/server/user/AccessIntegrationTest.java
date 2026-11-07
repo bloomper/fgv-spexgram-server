@@ -19,6 +19,10 @@ package nu.fgv.spexgram.server.user;
 
 import nu.fgv.spexgram.server.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Who may call what: GraphQL answers without a token too, with only public data; roles on {@code fgv-spexgram}
@@ -39,6 +43,17 @@ class AccessIntegrationTest extends AbstractIntegrationTest {
                 .path("me.email").entity(String.class).isEqualTo(EDITOR)
                 .path("me.roles").entityList(String.class).contains("USER", "EDITOR");
         graphQl(NO_ACCESS).document("{ me { roles } }").execute().path("me.roles").entityList(String.class).hasSize(0);
+    }
+
+    @Test
+    void anIdTokenIsRefusedInPlaceOfAnAccessToken() {
+        final int status = http().post().uri("/api/graphql")
+                .header(HttpHeaders.AUTHORIZATION, idToken(EDITOR))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"query\": \"{ me { username } }\"}")
+                .exchange((request, response) -> response.getStatusCode().value());
+
+        assertThat(status).isEqualTo(401);
     }
 
     @Test

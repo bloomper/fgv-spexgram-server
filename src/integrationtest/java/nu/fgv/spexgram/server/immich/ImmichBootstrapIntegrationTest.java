@@ -48,16 +48,23 @@ class ImmichBootstrapIntegrationTest extends AbstractIntegrationTest {
     @Test
     void theKeysAreKeptAsFilesWithTheirPermissions() throws Exception {
         for (final ImmichKeys.Purpose purpose : ImmichKeys.Purpose.values()) {
-            assertThat(DATA.resolve("immich-keys").resolve(purpose.fileName())).isNotEmptyFile();
+            final String folder = purpose == ImmichKeys.Purpose.MEDIA ? "immich-media-key" : "immich-keys";
+
+            assertThat(DATA.resolve(folder).resolve(purpose.fileName())).isNotEmptyFile();
             assertThat(immichClient.apiKey(keys.read(purpose).orElseThrow()))
                     .hasValueSatisfying(key -> assertThat(key.permissions()).containsExactlyInAnyOrderElementsOf(purpose.permissions()));
         }
         assertThat(keys.isReady()).isTrue();
+        // The media server mounts only the media key's folder, which holds nothing else
+        assertThat(DATA.resolve("immich-keys/media.key")).doesNotExist();
+        try (var files = Files.list(DATA.resolve("immich-media-key"))) {
+            assertThat(files.map(file -> file.getFileName().toString())).containsExactly("media.key");
+        }
     }
 
     @Test
     void theMediaKeyCannotDeleteAndTheBulkImportKeyCannotRead() throws Exception {
-        final String media = Files.readString(DATA.resolve("immich-keys/media.key"));
+        final String media = Files.readString(DATA.resolve("immich-media-key/media.key"));
         final String bulk = Files.readString(DATA.resolve("immich-keys/bulk-import.key"));
         final RestClient immich = RestClient.builder()
                 .baseUrl(immichUrl())

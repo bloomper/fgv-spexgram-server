@@ -34,7 +34,8 @@ services:
       - FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD
       - FGV_SPEXGRAM_MYSQL_USER_PASSWORD
 
-  # Signed media addresses, passed on to Immich with the read-only key the API leaves in ./data/immich-keys
+  # Signed media addresses, passed on to Immich with the read-only key the API leaves in ./data/immich-media-key; it
+  # mounts only that folder, never the API's own key in ./data/immich-keys
   spexgram-media:
     image: 'nginx:1.29-alpine'
     restart: unless-stopped
@@ -63,7 +64,7 @@ services:
       - "127.0.0.1:8086:80"
     volumes:
       - ${SPEXGRAM_DEPLOY:-../fgv-spexgram-deploy}/media/default.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - ./data/immich-keys:/run/immich-keys:ro
+      - ./data/immich-media-key:/run/immich-keys:ro
     networks:
       - default
       - fgv
@@ -89,6 +90,7 @@ services:
       API_UPLOADS_ROOT: /data/uploads
       API_IMMICH_URL: http://immich-server:2283
       API_IMMICH_KEYS_DIR: /data/immich-keys
+      API_IMMICH_MEDIA_KEY_DIR: /data/immich-media-key
       API_SPEXREGISTER_GRAPHQL_URL: http://spexregister-api:8080/api/graphql
       API_IMPORT_SAMPLE_DATA: ${API_IMPORT_SAMPLE_DATA:-false}
       API_SAMPLE_DATA_SIZE: ${API_SAMPLE_DATA_SIZE:-small}
@@ -113,6 +115,7 @@ services:
       - fgv_spexgram_api_log:/data/log_data
       - ./data/uploads:/data/uploads
       - ./data/immich-keys:/data/immich-keys
+      - ./data/immich-media-key:/data/immich-media-key
     networks:
       - default
       - fgv
