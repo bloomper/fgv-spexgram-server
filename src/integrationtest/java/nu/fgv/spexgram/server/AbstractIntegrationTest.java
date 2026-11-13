@@ -107,7 +107,7 @@ public abstract class AbstractIntegrationTest {
     protected static final String PASSWORD = "s3cr3t-s3cr3t";
     protected static final String CLIENT_ID = "fgv-spexgram";
     protected static final String SPEX_ID = "00000000-0000-7000-8000-000000000001";
-    protected static final String IMMICH_VERSION = "v3.3.6";
+    protected static final String IMMICH_VERSION = "v3.4.1";
     protected static final WireMockServer WIREMOCK = new WireMockServer(options().dynamicPort());
     protected static final Path DATA = Path.of("build/integrationtest-data").toAbsolutePath();
     private static final String REALM = "fgv";
@@ -132,7 +132,7 @@ public abstract class AbstractIntegrationTest {
             .withSharedMemorySize(128L * 1024 * 1024)
             .withTmpFs(Map.of("/var/lib/postgresql/data", "rw"));
     private static final GenericContainer<?> IMMICH_VALKEY = new GenericContainer<>(
-            "docker.io/valkey/valkey:9@sha256:c123e3715db63d06d4ad6964884037aa0d5d4d703939b9929954112889708e1d")
+            "docker.io/valkey/valkey:9@sha256:418652cfb58ef879d4978c33553735d7147016032d5aefaa14c828e611eb9dfd")
             .withNetwork(IMMICH_NETWORK)
             .withNetworkAliases("immich-valkey");
     private static final GenericContainer<?> IMMICH = new GenericContainer<>("ghcr.io/immich-app/immich-server:" + IMMICH_VERSION)

@@ -94,7 +94,7 @@ There are also configuration parameters in ``.env`` that can be tweaked if so de
 |API_KEYCLOAK_CLIENT_CLIENT_ID|The Keycloak client id of Spexgram Web|fgv-spexgram
 |API_IMPORT_SAMPLE_DATA|A flag determining whether to import sample data or not|false
 |API_SAMPLE_DATA_SIZE|``small`` (about 15 albums and 300 items) or ``large`` (about 300 albums and 20,000 items)|small
-|IMMICH_VERSION|The pinned Immich release|v3.3.6
+|IMMICH_VERSION|The pinned Immich release|v3.4.1
 |SPEXGRAM_WEB_ORIGIN|The web origin the media server allows (CORS)|http://localhost:3004
 
 |===

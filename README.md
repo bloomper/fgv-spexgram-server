@@ -21,7 +21,7 @@ test credentials. The GraphQL schema is `src/main/resources/graphql/schema.graph
 
 ## Immich
 
-Immich is pinned to **v3.3.6**. Its client (`immich/ImmichClient`) is written by hand for the twenty-odd endpoints
+Immich is pinned to **v3.4.1**. Its client (`immich/ImmichClient`) is written by hand for the twenty-odd endpoints
 Spexgram uses rather than generated: the OpenAPI document has several hundred operations, and Spexgram reads Immich's
 large system configuration as a tree it changes a few values in. The pinned version's document is checked in as
 `src/main/resources/immich/immich-openapi-specs.json`, and `ImmichClientContractTest` checks that every endpoint,

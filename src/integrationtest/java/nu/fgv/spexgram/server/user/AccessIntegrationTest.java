@@ -103,7 +103,7 @@ class AccessIntegrationTest extends AbstractIntegrationTest {
         graphQl(ADMIN).document("{ settings { maxUploadGb } immichStatus { available version queues { name } } }").execute()
                 .path("settings.maxUploadGb").entity(Integer.class).isEqualTo(4)
                 .path("immichStatus.available").entity(Boolean.class).isEqualTo(true)
-                .path("immichStatus.version").entity(String.class).isEqualTo("v3.3.6");
+                .path("immichStatus.version").entity(String.class).isEqualTo("v3.4.1");
     }
 
     @Test
