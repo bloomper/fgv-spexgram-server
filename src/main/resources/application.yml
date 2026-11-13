@@ -78,6 +78,8 @@ spexgram:
   jobs:
     spex-refresh:
       cron-expression: 0 15 3 * * * # Every day at 03:15
+    spexipedia-sync:
+      cron-expression: 0 */5 * * * * # Every five minutes
     unsorted-scan:
       cron-expression: 0 */5 * * * * # Every five minutes
     processing-poll:
@@ -126,8 +128,10 @@ spexgram:
     verify-url: https://challenges.cloudflare.com/turnstile/v0/siteverify
   mail:
     from: ${MAIL_FROM:noreply@localhost}
-  spexregister:
-    graphql-url: ${API_SPEXREGISTER_GRAPHQL_URL:https://api.register.fgv.local.nu:8443/api/graphql}
+  spexipedia:
+    graphql-url: ${API_SPEXIPEDIA_GRAPHQL_URL:https://api.spexipedia.fgv.local.nu:8443/api/graphql}
+    web-url: ${SPEXIPEDIA_WEB_URL:}
+    sync-enabled: ${API_SPEXIPEDIA_SYNC_ENABLED:true}
   data:
     import-sample-data: ${API_IMPORT_SAMPLE_DATA:false}
     sample-data-size: ${API_SAMPLE_DATA_SIZE:small}

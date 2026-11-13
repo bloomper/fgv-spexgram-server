@@ -15,7 +15,7 @@
  */
 
 /**
- * Sample data: generated albums, photos and videos built on Spexregister's sample spex and users.
+ * Sample data: generated albums, photos and videos built on Spexipedia's sample spex and users.
  */
 @NullMarked
 package nu.fgv.spexgram.server.util.data;

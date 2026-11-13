@@ -34,22 +34,24 @@ import java.time.Duration;
 import static org.springframework.security.oauth2.client.web.client.RequestAttributeClientRegistrationIdResolver.clientRegistrationId;
 
 /**
- * The GraphQL client for Spexregister: client credentials of {@code fgv-spexgram-service}, which holds only the
- * {@code MEDIA} role, with 3-second timeouts.
+ * The clients for Spexipedia: GraphQL with the client credentials of {@code fgv-spexgram-service}, which holds
+ * {@code SYNC} on {@code fgv-spexipedia} for its change feed.
  *
  * @author Anders Jacobsson
  * @since 1.0
  */
 @Configuration
-public class SpexregisterClientConfig {
+public class SpexipediaClientConfig {
 
     public static final String REGISTRATION_ID = "fgv-spexgram-service";
 
-    private static final Duration TIMEOUT = Duration.ofSeconds(3);
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
+    // A page of the change feed is up to 500 records
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
 
     @Bean
-    public OAuth2AuthorizedClientManager spexregisterAuthorizedClientManager(final ClientRegistrationRepository clientRegistrationRepository,
-                                                                             final OAuth2AuthorizedClientService authorizedClientService) {
+    public OAuth2AuthorizedClientManager serviceAuthorizedClientManager(final ClientRegistrationRepository clientRegistrationRepository,
+                                                                        final OAuth2AuthorizedClientService authorizedClientService) {
         final AuthorizedClientServiceOAuth2AuthorizedClientManager manager =
                 new AuthorizedClientServiceOAuth2AuthorizedClientManager(clientRegistrationRepository, authorizedClientService);
 
@@ -57,25 +59,17 @@ public class SpexregisterClientConfig {
         return manager;
     }
 
-    /**
-     * Spexregister's API with {@code fgv-spexgram-service}'s token.
-     */
     @Bean
-    public RestClient spexregisterRestClient(final SpexgramProperties properties,
-                                             final OAuth2AuthorizedClientManager spexregisterAuthorizedClientManager) {
-        return RestClient.builder()
-                                .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(HttpClientSettings.defaults()
-                        .withConnectTimeout(TIMEOUT)
-                        .withReadTimeout(TIMEOUT)))
-                .requestInterceptor(new OAuth2ClientHttpRequestInterceptor(spexregisterAuthorizedClientManager))
+    public HttpSyncGraphQlClient spexipediaGraphQlClient(final SpexgramProperties properties,
+                                                         final OAuth2AuthorizedClientManager serviceAuthorizedClientManager) {
+        final RestClient restClient = RestClient.builder()
+                .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(HttpClientSettings.defaults()
+                        .withConnectTimeout(CONNECT_TIMEOUT)
+                        .withReadTimeout(READ_TIMEOUT)))
+                .requestInterceptor(new OAuth2ClientHttpRequestInterceptor(serviceAuthorizedClientManager))
                 .defaultRequest(request -> request.attributes(clientRegistrationId(REGISTRATION_ID)))
                 .build();
-    }
 
-    @Bean
-    public HttpSyncGraphQlClient spexregisterGraphQlClient(final SpexgramProperties properties,
-                                                           final RestClient spexregisterRestClient) {
-        return HttpSyncGraphQlClient.builder(spexregisterRestClient).url(properties.spexregister().graphqlUrl()).build();
+        return HttpSyncGraphQlClient.builder(restClient).url(properties.spexipedia().graphqlUrl()).build();
     }
-
 }

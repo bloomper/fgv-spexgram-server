@@ -41,7 +41,7 @@ public record SpexgramProperties(String timeZone,
                                  Immich immich,
                                  Turnstile turnstile,
                                  Mail mail,
-                                 Spexregister spexregister,
+                                 Spexipedia spexipedia,
                                  Data data) {
 
     /**
@@ -96,7 +96,12 @@ public record SpexgramProperties(String timeZone,
     public record Mail(String from) {
     }
 
-    public record Spexregister(String graphqlUrl) {
+    /**
+     * @param graphqlUrl  Spexipedia's GraphQL API, e.g. {@code http://spexipedia-api:8080/api/graphql}
+     * @param webUrl      Spexipedia's web, for links to its pages; empty for none
+     * @param syncEnabled whether to follow its change feed
+     */
+    public record Spexipedia(String graphqlUrl, String webUrl, boolean syncEnabled) {
     }
 
     public record Data(boolean importSampleData, String sampleDataSize, String sampleUserPassword) {

@@ -23,7 +23,7 @@ import nu.fgv.spexgram.server.album.SpexRef;
 import nu.fgv.spexgram.server.TestClock;
 import nu.fgv.spexgram.server.user.CallerService;
 import nu.fgv.spexgram.server.util.error.BadRequestException;
-import nu.fgv.spexgram.server.util.error.SpexregisterUnavailableException;
+import nu.fgv.spexgram.server.util.error.SpexipediaUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,7 +45,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Spex read from Spexregister: searching, single spex, and copying them onto albums.
+ * Spex read from Spexipedia: searching, single spex, and copying them onto albums.
  *
  * @author Anders Jacobsson
  * @since 1.0
@@ -57,7 +57,7 @@ class SpexServiceTest {
     private static final SpexDto NOBEL_REVIVAL = new SpexDto(uuid(2), "Nobel", 2026, true, uuid(1), uuid(1), "Chalmersspexet");
     private static final SpexDto CLEOPATRA = new SpexDto(uuid(3), "Cleopatra", 2024, false, null, uuid(1), "Chalmersspexet");
     @Mock
-    private SpexregisterClient client;
+    private SpexipediaClient client;
     @Mock
     private AlbumRepository albumRepository;
     @Mock
@@ -81,13 +81,13 @@ class SpexServiceTest {
     }
 
     @Test
-    void searchIsForEditorsAndFailsWhileSpexregisterIsDown() {
+    void searchIsForEditorsAndFailsWhileSpexipediaIsDown() {
         when(callerService.current()).thenReturn(TestCallers.viewer());
         assertThatThrownBy(() -> service.search("nob")).isInstanceOf(AccessDeniedException.class);
 
         when(callerService.current()).thenReturn(TestCallers.editor());
-        when(client.allSpex()).thenThrow(new SpexregisterClient.SpexregisterCallException("down"));
-        assertThatThrownBy(() -> service.search("nob")).isInstanceOf(SpexregisterUnavailableException.class);
+        when(client.allSpex()).thenThrow(new SpexipediaClient.SpexipediaCallException("down"));
+        assertThatThrownBy(() -> service.search("nob")).isInstanceOf(SpexipediaUnavailableException.class);
     }
 
     @Test
@@ -140,13 +140,13 @@ class SpexServiceTest {
     }
 
     @Test
-    void theRefreshDoesNothingWithoutAlbumsAndSurvivesSpexregisterBeingDown() {
+    void theRefreshDoesNothingWithoutAlbumsAndSurvivesSpexipediaBeingDown() {
         when(albumRepository.findWithSpex()).thenReturn(List.of());
         service.refresh();
         verify(client, never()).allSpex();
 
         when(albumRepository.findWithSpex()).thenReturn(List.of(new Album()));
-        when(client.allSpex()).thenThrow(new SpexregisterClient.SpexregisterCallException("down"));
+        when(client.allSpex()).thenThrow(new SpexipediaClient.SpexipediaCallException("down"));
         service.refresh();
     }
 }

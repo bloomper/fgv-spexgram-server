@@ -24,7 +24,7 @@ import nu.fgv.spexgram.server.util.error.BadRequestException;
 import nu.fgv.spexgram.server.util.error.ConflictException;
 import nu.fgv.spexgram.server.util.error.DirectoryUnavailableException;
 import nu.fgv.spexgram.server.util.error.ResourceNotFoundException;
-import nu.fgv.spexgram.server.util.error.SpexregisterUnavailableException;
+import nu.fgv.spexgram.server.util.error.SpexipediaUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -79,7 +79,7 @@ class GlobalExceptionResolverTest {
         assertThat(resolve(new ConflictException("error.x")).getErrorType().toString()).isEqualTo("CONFLICT");
         assertThat(resolve(new OptimisticLockingFailureException("x")).getErrorType().toString()).isEqualTo("CONFLICT");
         assertThat(resolve(new OptimisticLockException("x")).getErrorType().toString()).isEqualTo("CONFLICT");
-        assertThat(resolve(new SpexregisterUnavailableException(new RuntimeException())).getErrorType().toString()).isEqualTo("SPEXREGISTER_UNAVAILABLE");
+        assertThat(resolve(new SpexipediaUnavailableException(new RuntimeException())).getErrorType().toString()).isEqualTo("SPEXIPEDIA_UNAVAILABLE");
         assertThat(resolve(new DirectoryUnavailableException(new RuntimeException())).getErrorType().toString()).isEqualTo("DIRECTORY_UNAVAILABLE");
         assertThat(resolve(new IllegalStateException("bug"))).isNull();
     }

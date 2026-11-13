@@ -20,16 +20,16 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Spexregister could not be reached when it was needed.
+ * Spexipedia could not be reached when it was needed.
  *
  * @author Anders Jacobsson
  * @since 1.0
  */
-public class SpexregisterUnavailableException extends ResponseStatusException {
+public class SpexipediaUnavailableException extends ResponseStatusException {
 
-    public static final String MESSAGE_CODE = "error.spexregister.unavailable";
+    public static final String MESSAGE_CODE = "error.spexipedia.unavailable";
 
-    public SpexregisterUnavailableException(final Throwable cause) {
+    public SpexipediaUnavailableException(final Throwable cause) {
         super(HttpStatus.SERVICE_UNAVAILABLE, MESSAGE_CODE, cause, MESSAGE_CODE, null);
     }
 }

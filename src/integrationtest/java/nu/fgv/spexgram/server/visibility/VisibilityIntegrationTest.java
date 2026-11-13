@@ -131,6 +131,25 @@ class VisibilityIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void spexipediaAlsoGetsMembersItemsAndAlbumsOfASpexButNoOriginals() throws Exception {
+        final String album = createAlbum("MEMBERS");
+        final List<String> items = readyPhotos(album, folder, "Gruppbild", "Repetition");
+        final String spexipedia = serviceToken("fgv-spexipedia-service");
+
+        setItemVisibility(items.getFirst(), "PUBLIC");
+        graphQlWithToken(spexipedia).document("query($ids: [ID!]!) { publicItems(ids: $ids) { id effectiveVisibility media { thumbnailUrl originalUrl } } }")
+                .variable("ids", items).execute()
+                .path("publicItems[*].id").entityList(String.class).containsExactly(items.toArray(String[]::new))
+                .path("publicItems[1].effectiveVisibility").entity(String.class).isEqualTo("MEMBERS")
+                .path("publicItems[1].media.thumbnailUrl").entity(String.class).matches(url -> url.matches(MEDIA.formatted("thumbnail")))
+                .path("publicItems[1].media.originalUrl").valueIsNull();
+        graphQlWithToken(spexipedia).document("query($id: ID!) { spexAlbums(spexId: $id) { id items { items { id } } } }")
+                .variable("id", SPEX_ID).execute()
+                .path("spexAlbums[*].id").entityList(String.class).containsExactly(album)
+                .path("spexAlbums[0].items.items").entityList(Object.class).hasSize(2);
+    }
+
+    @Test
     void membersSeeMembersAlbumsAndEditorsAlsoUnpublishedOnes() throws Exception {
         final String members = createAlbum("MEMBERS");
         final String unpublished = createAlbum("UNPUBLISHED");

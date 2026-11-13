@@ -131,13 +131,17 @@ class ItemViewsTest {
     }
 
     @Test
-    void spexipediaSeesMembersItemsWithThumbnailsAndPreviewsOnly() {
+    void spexipediaSeesMembersItemsWithThumbnailsPreviewsAndBrowserVideosButNeverOriginals() {
         final Item item = item(album(Visibility.MEMBERS), Visibility.MEMBERS);
 
         item.setType(ItemType.VIDEO);
         assertThat(ItemViews.canSee(item, SPEXIPEDIA)).isTrue();
         assertThat(ItemViews.canSee(item, VISITOR)).isFalse();
         assertThat(views.toDto(item, SPEXIPEDIA).media().videoUrl()).isNull();
+        assertThat(views.toDto(item, SPEXIPEDIA).media().originalUrl()).isNull();
+
+        item.setTranscoded(true);
+        assertThat(views.toDto(item, SPEXIPEDIA).media().videoUrl()).contains("/video/");
         assertThat(views.toDto(item, SPEXIPEDIA).media().originalUrl()).isNull();
     }
 
@@ -181,6 +185,6 @@ class ItemViewsTest {
         video.setTranscoded(true);
         assertThat(views.toDto(video, VISITOR).media().videoUrl()).contains("/video/");
         assertThat(views.toDto(video, VISITOR).media().originalUrl()).isNull();
-        assertThat(views.toDto(video, SPEXIPEDIA).media().videoUrl()).isNull();
+        assertThat(views.toDto(video, SPEXIPEDIA).media().videoUrl()).contains("/video/");
     }
 }

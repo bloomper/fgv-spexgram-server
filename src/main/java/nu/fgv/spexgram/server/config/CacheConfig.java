@@ -42,7 +42,7 @@ public class CacheConfig {
     public CacheManager cacheManager() {
         final CaffeineCacheManager cacheManager = new CaffeineCacheManager();
 
-        // Editors search the spex as they type; Spexregister is asked once every few minutes, not on every key
+        // Editors search the spex as they type; Spexipedia is asked once every few minutes, not on every key
         cacheManager.registerCustomCache(ALL_SPEX, Caffeine.newBuilder()
                 .expireAfterWrite(Duration.ofMinutes(5))
                 .maximumSize(1)

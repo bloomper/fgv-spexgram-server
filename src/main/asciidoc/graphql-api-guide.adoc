@@ -34,7 +34,7 @@ The GraphQL API provides the error code in ``extensions.classification`` and a m
 |``BAD_REQUEST``|The input breaks a rule, e.g. a visitor's report without a passing Turnstile token.
 |``CONFLICT``|Someone else changed the resource since the user read it. Ask them to reload.
 |``IMMICH_UNAVAILABLE``|Immich cannot be reached. Albums and captions are still shown; uploads are refused.
-|``SPEXREGISTER_UNAVAILABLE``|Spexregister cannot be reached. Only ``spexSearch`` and picking a new spex fail.
+|``SPEXIPEDIA_UNAVAILABLE``|Spexipedia cannot be reached. Only ``spexSearch`` and picking a new spex fail.
 |``DIRECTORY_UNAVAILABLE``|The FGV realm's users cannot be read in Keycloak.
 
 |===
@@ -53,7 +53,7 @@ Spexgram Server uses the following roles, which are client roles on ``fgv-spexgr
 |USER|Members: albums and items for members too, search by content, the map, contributions, reports
 |EDITOR|Creates and edits albums, uploads, captions, sets visibility, reviews contributions, handles reports, sorts unsorted items, trashes
 |ADMIN|Everything an editor does, plus settings, album kinds, emptying the trash, Immich's status, maintenance jobs and everyone's audit log
-|SPEXIPEDIA|Held only by Spexipedia's service account: ``publicItems`` and ``spexAlbums`` also return members' items, with thumbnails and previews only
+|SPEXIPEDIA|Held only by Spexipedia's service account: ``publicItems`` and ``spexAlbums`` also return members' items, with thumbnails, previews and the browser version of videos, never originals
 
 |===
 
@@ -123,10 +123,12 @@ Stable web addresses are ``/albums/<id>``, ``/items/<id>`` and ``/spex/<spexId>`
 Editors' changes are recorded in the audit log (``auditLog``): who, when, what and a summary, changes of visibility included.
 Editors see their own changes, admins everyone's.
 
-[[spexregister]]
-== Spexregister
+[[spexipedia]]
+== Spexipedia
 
-Spex, their revivals and categories are read from Spexregister, which Spexgram Server calls as the service account ``fgv-spexgram-service`` with Spexregister's ``MEDIA`` role.
-An album keeps a copy of its spex, refreshed every night, so the archive works while Spexregister is down.
+Spex, their revivals and categories are read from Spexipedia, FGV's source of base data, which Spexgram Server calls as the service account ``fgv-spexgram-service``.
+An album keeps a copy of its spex, so the archive works while Spexipedia is down.
+The copies follow Spexipedia's change feed (``SYNC`` on ``fgv-spexipedia``): Spexgram pulls it every five minutes and when Spexipedia calls ``POST /api/sync/notify`` (``NOTIFY``); a merge in Spexipedia moves albums to the spex merged into.
+The maintenance job ``SPEX_REFRESH`` copies everything again every night.
 
 xref:index.adoc[Back to start page]

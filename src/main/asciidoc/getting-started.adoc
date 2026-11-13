@@ -44,8 +44,8 @@ Keycloak (with the realm ``fgv``), Mailpit, Umami and Caddy, which FGV's applica
 Start it once as its README describes; it keeps running for every application and creates the Docker network ``fgv-local``, which this repository's ``docker-compose.yaml`` joins.
 Keycloak imports the realm, with its clients and their secrets, from ``realm/fgv.json`` in https://github.com/bloomper/fgv-keycloak[fgv-keycloak].
 
-Spexgram reads spex from Spexregister, and its sample data is built on Spexregister's (see <<sample_data>>).
-Run https://github.com/bloomper/spexregister-server[spexregister-server]'s local stack as well, as its getting started guide describes.
+Spexgram reads spex from Spexipedia, and its sample data is built on Spexipedia's spex and Spexregister's users (see <<sample_data>>).
+Run the local stacks of fgv-spexipedia-server and https://github.com/bloomper/spexregister-server[spexregister-server] as well, as their getting started guides describe.
 
 The media server's nginx configuration is ``media/default.conf.template`` in the sibling ``fgv-spexgram-deploy`` checkout (or where ``SPEXGRAM_DEPLOY`` points).
 
@@ -72,7 +72,7 @@ To set a value by hand, write it without a trailing newline, e.g. ``printf '%s' 
 
 |FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD|The password for the root user of Spexgram Server's database||verysecret
 |FGV_SPEXGRAM_MYSQL_USER_PASSWORD|The password for the user of Spexgram Server's database||secret
-|API_KEYCLOAK_SERVICE_CLIENT_SECRET|The client secret of ``fgv-spexgram-service``, with which Spexgram Server calls Spexregister and reads editors' email addresses in Keycloak|Must match the value in ``realm/fgv.json`` in fgv-keycloak, search for ``fgv-spexgram-service`` and pick the value for ``secret`` in the same section|
+|API_KEYCLOAK_SERVICE_CLIENT_SECRET|The client secret of ``fgv-spexgram-service``, with which Spexgram Server calls Spexipedia and reads editors' email addresses in Keycloak|Must match the value in ``realm/fgv.json`` in fgv-keycloak, search for ``fgv-spexgram-service`` and pick the value for ``secret`` in the same section|
 |API_KEYCLOAK_ADMIN_CLIENT_SECRET|The client secret of ``fgv-admin``, with which the sample data import gives users roles|Must match the value in ``realm/fgv.json``, search for ``fgv-admin``|
 |API_MEDIA_SIGNING_KEY|Signs the media addresses, which the media server checks; shared by ``spexgram-api`` and ``spexgram-media``|A long random string, e.g. from ``openssl rand -base64 32``|
 |API_IMMICH_ADMIN_PASSWORD|The password of Immich's admin, Spexgram's system user, which the API creates in Immich|A long random string|
@@ -127,7 +127,7 @@ $ docker compose -f ../../fgv-infra-deploy/local/compose.yaml up -d
 $ docker compose up -d                 # add --profile ml for search by content, which needs a few GB of memory
 ----
 
-This starts MySQL, Immich (server, PostgreSQL and Valkey; machine learning with the profile ``ml``), the media server and ``spexgram-api``, which reaches Keycloak, Spexregister and Mailpit by their container names on the ``fgv-local`` network and Immich on the project's own network.
+This starts MySQL, Immich (server, PostgreSQL and Valkey; machine learning with the profile ``ml``), the media server and ``spexgram-api``, which reaches Keycloak, Spexipedia and Mailpit by their container names on the ``fgv-local`` network and Immich on the project's own network.
 At start the API sets Immich up: it creates Immich's admin, configures it and creates its three API keys in ``./data/immich-keys`` and, for the media server, ``./data/immich-media-key`` (see <<immich>>).
 Caddy serves the API on ``https://api.spexgram.fgv.local.nu:8443`` and the media server on ``https://media.spexgram.fgv.local.nu:8443``.
 MySQL, Immich and the media server are also published on localhost, on ports 3310, 2283 and 8086.
@@ -173,10 +173,10 @@ Immich's system user and API keys are kept.
 None of the data can be traced to real individuals, i.e. no personally identifiable information (PII).
 The import needs the secret of ``fgv-admin``.
 
-The sample data is built on Spexregister's, so Spexregister must run with ``API_IMPORT_SAMPLE_DATA=true``:
+The sample data is built on Spexipedia's and Spexregister's, so both must run with ``API_IMPORT_SAMPLE_DATA=true``:
 
-* The albums belong to Spexregister's sample spex, read from its API.
-The import waits up to 5 minutes for Spexregister.
+* The albums belong to Spexipedia's sample spex, read from its API.
+The import waits up to 5 minutes for Spexipedia.
 * Spexregister's sample users get roles on ``fgv-spexgram`` (see <<test_credentials>>).
 The import refuses to run without them, which keeps it away from real environments.
 
@@ -198,7 +198,7 @@ The archive has albums of every kind and visibility, with and without spex, capt
 The administrative UI of Keycloak can be accessed at https://auth.fgv.local.nu:8443/auth.
 The username is ``KEYCLOAK_ADMIN`` in fgv-infra-deploy's ``local/.env`` and the password is in its ``local/.docker/secrets/KEYCLOAK_ADMIN_PASSWORD``.
 
-Spexgram uses the clients ``fgv-spexgram`` (the web, and Spexgram's roles ``USER``, ``EDITOR``, ``ADMIN`` and ``SPEXIPEDIA``), ``fgv-spexgram-service`` (Spexregister's ``MEDIA`` role, and ``realm-management``'s ``view-users`` for editors' email addresses) and ``fgv-admin`` (the sample data's users).
+Spexgram uses the clients ``fgv-spexgram`` (the web, and Spexgram's roles ``USER``, ``EDITOR``, ``ADMIN`` and ``SPEXIPEDIA``), ``fgv-spexgram-service`` (``SYNC`` on ``fgv-spexipedia`` for its change feed, and ``realm-management``'s ``view-users`` for editors' email addresses) and ``fgv-admin`` (the sample data's users).
 
 The integration tests import a copy of ``fgv.json`` at ``src/integrationtest/resources/realm/fgv.json``.
 After every realm change, replace it with the new ``realm/fgv.json`` from fgv-keycloak and commit it.
@@ -223,7 +223,7 @@ There are two types of tests:
 * Unit tests, located under ``src/test``, among them the API tests, which generate the xref:api-guide.adoc[HTTP API documentation]
 * Integration tests, located under ``src/integrationtest``
 
-Integration tests start MySQL, Keycloak and Immich (server, PostgreSQL and Valkey, without machine learning) with Testcontainers, so they need Docker, and use WireMock as a stand-in for Spexregister and Cloudflare Turnstile and GreenMail as the mail server.
+Integration tests start MySQL, Keycloak and Immich (server, PostgreSQL and Valkey, without machine learning) with Testcontainers, so they need Docker, and use WireMock as a stand-in for Spexipedia and Cloudflare Turnstile and GreenMail as the mail server.
 Uploads are processed by the real Immich.
 
 [source,bash]

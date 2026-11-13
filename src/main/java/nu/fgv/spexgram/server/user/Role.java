@@ -28,5 +28,9 @@ public enum Role {
     USER,
     EDITOR,
     ADMIN,
-    SPEXIPEDIA
+    SPEXIPEDIA,
+    /**
+     * Spexipedia's service account: telling Spexgram that its change feed has something new.
+     */
+    NOTIFY
 }

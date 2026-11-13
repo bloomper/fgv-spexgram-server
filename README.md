@@ -8,7 +8,7 @@ made public, and plain HTTP endpoints for resumable (tus) uploads and albums as 
 by [Immich][11], which runs headless behind the API: the API sets it up, sends it uploads, follows its processing and
 decides who may see what. The media server (`spexgram-media`, nginx) serves Immich's thumbnails, previews, originals
 and videos from signed, expiring addresses. It is backed by MySQL and Keycloak ([fgv-keycloak][1]) for authentication,
-and reads spex from Spexregister. [Spexgram Web][2] is its frontend and [fgv-spexgram-deploy][3] runs it on a server.
+and reads spex from Spexipedia. [Spexgram Web][2] is its frontend and [fgv-spexgram-deploy][3] runs it on a server.
 
 The product spec is in [fgv-spexgram-spec][4].
 

@@ -91,7 +91,8 @@ services:
       API_IMMICH_URL: http://immich-server:2283
       API_IMMICH_KEYS_DIR: /data/immich-keys
       API_IMMICH_MEDIA_KEY_DIR: /data/immich-media-key
-      API_SPEXREGISTER_GRAPHQL_URL: http://spexregister-api:8080/api/graphql
+      API_SPEXIPEDIA_GRAPHQL_URL: http://spexipedia-api:8080/api/graphql
+      SPEXIPEDIA_WEB_URL: ${SPEXIPEDIA_WEB_URL:-https://spexipedia.fgv.local.nu:8443}
       API_IMPORT_SAMPLE_DATA: ${API_IMPORT_SAMPLE_DATA:-false}
       API_SAMPLE_DATA_SIZE: ${API_SAMPLE_DATA_SIZE:-small}
       SPRING_MAIL_HOST: mailpit
