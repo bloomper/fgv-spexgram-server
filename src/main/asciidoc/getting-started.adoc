@@ -200,8 +200,8 @@ The username is ``KEYCLOAK_ADMIN`` in fgv-infra-deploy's ``local/.env`` and the 
 
 Spexgram uses the clients ``fgv-spexgram`` (the web, and Spexgram's roles ``USER``, ``EDITOR``, ``ADMIN`` and ``SPEXIPEDIA``), ``fgv-spexgram-service`` (Spexregister's ``MEDIA`` role, and ``realm-management``'s ``view-users`` for editors' email addresses) and ``fgv-admin`` (the sample data's users).
 
-The integration tests import a copy of ``fgv.json``.
-Refresh it with ``./gradlew syncRealm`` from the ``fgv-keycloak`` checkout two levels up after every realm change, and commit it.
+The integration tests import a copy of ``fgv.json`` at ``src/integrationtest/resources/realm/fgv.json``.
+After every realm change, replace it with the new ``realm/fgv.json`` from fgv-keycloak and commit it.
 
 [[caddy]]
 == Caddy
