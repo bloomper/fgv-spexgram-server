@@ -83,8 +83,8 @@ dependencies {
     implementation 'com.github.ben-manes.caffeine:caffeine'
     implementation 'com.graphql-java:graphql-java-extended-scalars:24.0'
     implementation 'io.micrometer:context-propagation:1.2.1'
-    implementation 'net.javacrumbs.shedlock:shedlock-spring:7.10.1'
-    implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:7.10.1'
+    implementation 'net.javacrumbs.shedlock:shedlock-spring:7.11.0'
+    implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:7.11.0'
     implementation 'org.keycloak:keycloak-admin-client:26.0.12'
     // Writes the EXIF of the generated sample photos
     implementation 'org.apache.commons:commons-imaging:1.0.0-alpha6'
