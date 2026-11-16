@@ -10,6 +10,11 @@ decides who may see what. The media server (`spexgram-media`, nginx) serves Immi
 and videos from signed, expiring addresses. It is backed by MySQL and Keycloak ([fgv-keycloak][1]) for authentication,
 and reads spex from Spexipedia. [Spexgram Web][2] is its frontend and [fgv-spexgram-deploy][3] runs it on a server.
 
+It also has a narrow, read-only MCP server at `/api/mcp`, for AI assistants: it lists, searches and describes the
+public albums and the spex they are about, as for a visitor whoever is signed in, and never the photos, videos or
+people themselves. Only tokens of the Keycloak client `fgv-spexgram-mcp` are accepted there; `getting-started.adoc`
+describes it.
+
 The product spec is in [fgv-spexgram-spec][4].
 
 ## Learning more

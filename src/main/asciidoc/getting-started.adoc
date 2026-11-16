@@ -90,6 +90,8 @@ There are also configuration parameters in ``.env`` that can be tweaked if so de
 |FGV_SPEXGRAM_MYSQL_USER|The user of Spexgram Server's database|spexgram
 |API_KEYCLOAK_REALM|The Keycloak realm of Spexgram Server|fgv
 |API_KEYCLOAK_CLIENT_CLIENT_ID|The Keycloak client id of Spexgram Web|fgv-spexgram
+|API_KEYCLOAK_MCP_CLIENT_ID|The Keycloak client id of MCP clients, the only one whose tokens the MCP endpoint accepts (see <<mcp_server>>)|fgv-spexgram-mcp
+|API_BASE_URL|Spexgram Server's public address; MCP tokens must have its ``/api/mcp`` as audience|https://api.spexgram.fgv.local.nu:8443
 |API_IMPORT_SAMPLE_DATA|A flag determining whether to import sample data or not|false
 |API_SAMPLE_DATA_SIZE|``small`` (about 15 albums and 300 items) or ``large`` (about 300 albums and 20,000 items)|small
 |IMMICH_VERSION|The pinned Immich release|v3.4.1
@@ -97,7 +99,7 @@ There are also configuration parameters in ``.env`` that can be tweaked if so de
 
 |===
 
-Access tokens are only accepted from the Keycloak clients ``fgv-spexgram`` and ``fgv-spexipedia-service`` (``API_SECURITY_AUTHORIZED_PARTIES``).
+Access tokens are only accepted from the Keycloak clients ``fgv-spexgram`` and ``fgv-spexipedia-service`` (``API_SECURITY_AUTHORIZED_PARTIES``), and on the MCP endpoint only from ``fgv-spexgram-mcp`` (``API_KEYCLOAK_MCP_CLIENT_ID``).
 
 Add the following to `/etc/hosts` (or the Windows equivalent):
 
@@ -189,7 +191,7 @@ The archive has albums of every kind and visibility, with and without spex, capt
 The administrative UI of Keycloak can be accessed at https://auth.fgv.local.nu:8443/auth.
 The username is ``KEYCLOAK_ADMIN`` in fgv-infra-deploy's ``local/.env`` and the password is in its ``local/.docker/secrets/KEYCLOAK_ADMIN_PASSWORD``.
 
-Spexgram uses the clients ``fgv-spexgram`` (the web, and Spexgram's roles ``USER``, ``EDITOR``, ``ADMIN`` and ``SPEXIPEDIA``) and ``fgv-spexgram-service`` (``SYNC`` on ``fgv-spexipedia`` for its change feed, and ``realm-management``'s ``view-users`` for editors' email addresses).
+Spexgram uses the clients ``fgv-spexgram`` (the web, and Spexgram's roles ``USER``, ``EDITOR``, ``ADMIN`` and ``SPEXIPEDIA``), ``fgv-spexgram-service`` (``SYNC`` on ``fgv-spexipedia`` for its change feed, and ``realm-management``'s ``view-users`` for editors' email addresses) and ``fgv-spexgram-mcp`` (MCP clients, see <<mcp_server>>).
 
 The integration tests import a copy of ``fgv.json`` at ``src/integrationtest/resources/realm/fgv.json``.
 After every realm change, replace it with the new ``realm/fgv.json`` from fgv-keycloak and commit it.
@@ -268,5 +270,33 @@ Enter values as follows (leave other fields empty).
 Request an access token by clicking ``Get New Access Token`` and use any of the test credentials to login.
 Use the obtained access token when invoking the API, e.g. https://api.spexgram.fgv.local.nu:8443/api/graphql.
 Without a token the API answers as for a visitor.
+
+[[mcp_server]]
+== MCP server
+
+Spexgram Server exposes an MCP (Model Context Protocol) server at ``/api/mcp`` (stateless streamable HTTP), letting AI assistants list, search and describe Spexgram's public albums and the spex they are about.
+It is read-only and deliberately narrow, since photos show people: every tool answers as for a visitor who is not logged in, so it returns only public albums whatever roles the caller has, an editor's included, through the same services and visibility rules as the API without login.
+It never returns the photos and videos themselves, their thumbnails or addresses, who is in them, contributions, reports or anything only editors and admins see, and no tool changes anything.
+
+|===
+|Tool|Arguments|Returns
+
+|``list_albums``|``spex`` (an id from ``list_spex`` or a title, revivals included), ``year``, ``page`` (from 0), ``size`` (at most 50)|Public albums, newest first: id, title, spex, year, dates, the number of public items and a link to the album in Spexgram Web; ``totalCount``, ``page``, ``size``
+|``search_albums``|``query`` (words in titles, places and descriptions), ``spex``, ``year``, ``limit`` (at most 50)|Public albums, best match first, as in ``list_albums``
+|``get_album``|``albumId``|A public album: as in ``list_albums``, plus its kind, place and description; an album that is not public is not found
+|``list_spex``|none|The spex with public albums, newest first: id, title, year, whether it is a revival and of which original, category and the number of public albums
+
+|===
+
+Authentication uses OAuth 2.0 against Keycloak with the public client ``fgv-spexgram-mcp`` (authorization code with PKCE, redirect URIs ``http://localhost:*`` and ``http://127.0.0.1:*``).
+Only tokens issued to that client are accepted by the MCP endpoint (``API_KEYCLOAK_MCP_CLIENT_ID``), and they are not accepted by the rest of the API.
+The tokens must also have the MCP endpoint's address as audience, ``API_BASE_URL`` followed by ``/api/mcp``, which ``fgv.json`` sets from ``SPEXGRAM_MCP_URL``.
+The tokens need no roles on ``fgv-spexgram``, since the tools show only what is public.
+Users confirm the access once, on Keycloak's consent page.
+MCP clients discover Keycloak through the protected resource metadata at ``/.well-known/oauth-protected-resource/api/mcp``.
+Keycloak does not allow dynamic client registration by default, so configure the MCP client with the client id ``fgv-spexgram-mcp``.
+
+Locally, the MCP server is available at ``https://api.spexgram.fgv.local.nu:8443/api/mcp``.
+It can for instance be explored with the MCP Inspector (https://github.com/modelcontextprotocol/inspector).
 
 xref:index.adoc[Back to start page]

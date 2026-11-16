@@ -48,6 +48,26 @@ spring:
         enabled: false
     http:
       path: /api/graphql
+  ai:
+    mcp:
+      server:
+        name: fgv-spexgram
+        version: 1.0.0
+        type: SYNC
+        protocol: STATELESS
+        streamable-http:
+          mcp-endpoint: /api/mcp
+        capabilities:
+          resource: false
+          prompt: false
+          completion: false
+        instructions: >-
+          Spexgram is FGV's archive of photos and short videos from the spex, organised in albums. These tools list
+          only the public albums, what anyone sees without logging in, whoever is signed in: an album's title, spex,
+          year, dates, place, description, how many public items it has and a link to its page in Spexgram. They never
+          return the photos and videos themselves, nor who is in them, and change nothing. A spex is a show of
+          Chalmersspexet or another FGV spex, by title and year; revivals are listed with their year and the
+          original they revive.
 
 management:
   server:
@@ -75,6 +95,8 @@ logging:
 spexgram:
   time-zone: Europe/Stockholm
   web-url: ${API_WEB_URL:http://localhost:3004}
+  # The API's public address, whose /api/mcp is the audience MCP tokens must have
+  base-url: ${API_BASE_URL:https://api.spexgram.fgv.local.nu:8443}
   jobs:
     spex-refresh:
       cron-expression: 0 15 3 * * * # Every day at 03:15
@@ -101,6 +123,9 @@ spexgram:
     authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexgram,fgv-spexipedia-service}
     # Shared with the web, which sends it with the visitor's address (X-Client-IP)
     client-ip-secret: ${API_CLIENT_IP_SECRET:}
+  mcp:
+    # The clients (azp) whose tokens the MCP endpoint accepts, and only it
+    authorized-parties: ${API_KEYCLOAK_MCP_CLIENT_ID:fgv-spexgram-mcp}
   media:
     # The DNS-only media hostname served by spexgram-media (nginx)
     base-url: ${API_MEDIA_BASE_URL:https://media.spexgram.fgv.local.nu:8443}

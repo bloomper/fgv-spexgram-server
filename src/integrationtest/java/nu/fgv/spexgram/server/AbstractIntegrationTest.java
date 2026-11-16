@@ -106,6 +106,7 @@ public abstract class AbstractIntegrationTest {
     protected static final String NO_ACCESS = "utan" + DOMAIN;
     protected static final String PASSWORD = "s3cr3t-s3cr3t";
     protected static final String CLIENT_ID = "fgv-spexgram";
+    protected static final String MCP_CLIENT_ID = "fgv-spexgram-mcp";
     protected static final String SPEX_ID = "00000000-0000-7000-8000-000000000001";
     protected static final String IMMICH_VERSION = "v3.4.1";
     protected static final WireMockServer WIREMOCK = new WireMockServer(options().dynamicPort());
@@ -217,6 +218,12 @@ public abstract class AbstractIntegrationTest {
             web.setDirectAccessGrantsEnabled(true);
             realm.clients().get(web.getId()).update(web);
 
+            final ClientRepresentation mcp = realm.clients().findByClientId(MCP_CLIENT_ID).getFirst();
+
+            mcp.setDirectAccessGrantsEnabled(true);
+            mcp.setConsentRequired(false);
+            realm.clients().get(mcp.getId()).update(mcp);
+
             createUser(realm, VIEWER, "Lisa", List.of("USER"));
             createUser(realm, EDITOR, "Erik", List.of("USER", "EDITOR"));
             createUser(realm, ADMIN, "Anna", List.of("USER", "ADMIN"));
@@ -321,11 +328,24 @@ public abstract class AbstractIntegrationTest {
         });
     }
 
+    /**
+     * A user's access token from {@code fgv-spexgram-mcp}, the public client MCP clients use, by password grant.
+     */
+    protected static String mcpToken(final String user) {
+        return TOKENS.computeIfAbsent("mcp:" + user, _ -> "Bearer " + tokens(user, MCP_CLIENT_ID).get("access_token"));
+    }
+
     private static Map<String, Object> tokens(final String user) {
+        return tokens(user, CLIENT_ID);
+    }
+
+    private static Map<String, Object> tokens(final String user, final String clientId) {
         final MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
 
-        Map.of("grant_type", "password", "client_id", CLIENT_ID, "client_secret", SECRETS.get(CLIENT_ID),
-                "username", user, "password", PASSWORD, "scope", "openid").forEach(form::add);
+        Map.of("grant_type", "password", "client_id", clientId, "username", user, "password", PASSWORD, "scope", "openid").forEach(form::add);
+        if (SECRETS.containsKey(clientId)) {
+            form.add("client_secret", SECRETS.get(clientId));
+        }
 
         final String response = RestClient.create()
                 .post()

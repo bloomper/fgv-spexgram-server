@@ -192,7 +192,14 @@ public class AlbumService {
 
     @Transactional(readOnly = true)
     public AlbumPage albums(final @Nullable AlbumFilter filter, final int page, final int size) {
-        final Viewer viewer = viewerService.current();
+        return albums(filter, page, size, viewerService.current());
+    }
+
+    /**
+     * The albums the given viewer may see, e.g. {@link Viewer#visitor()} for MCP, which shows only public albums.
+     */
+    @Transactional(readOnly = true)
+    public AlbumPage albums(final @Nullable AlbumFilter filter, final int page, final int size, final Viewer viewer) {
         final int p = Math.max(page, 0);
         final int s = Math.clamp(size, 1, maxPage(viewer));
         final Page<Album> albums = repository.findAll(filtered(filter, viewer), PageRequest.of(p, s, NEWEST_FIRST));
@@ -202,8 +209,11 @@ public class AlbumService {
 
     @Transactional(readOnly = true)
     public @Nullable AlbumDto album(final UUID id) {
-        final Viewer viewer = viewerService.current();
+        return album(id, viewerService.current());
+    }
 
+    @Transactional(readOnly = true)
+    public @Nullable AlbumDto album(final UUID id, final Viewer viewer) {
         return repository.findByUuid(id).filter(album -> ItemViews.canSee(album, viewer)).map(AlbumService::toDto).orElse(null);
     }
 
@@ -255,7 +265,11 @@ public class AlbumService {
     }
 
     private List<Album> visibleAlbums() {
-        return repository.findAll(ItemSpecifications.albumsVisibleTo(viewerService.current()));
+        return visibleAlbums(viewerService.current());
+    }
+
+    private List<Album> visibleAlbums(final Viewer viewer) {
+        return repository.findAll(ItemSpecifications.albumsVisibleTo(viewer));
     }
 
     @Transactional(readOnly = true)
@@ -290,10 +304,15 @@ public class AlbumService {
      */
     @Transactional(readOnly = true)
     public List<AlbumSpexDto> spexWithAlbums() {
+        return spexWithAlbums(viewerService.current());
+    }
+
+    @Transactional(readOnly = true)
+    public List<AlbumSpexDto> spexWithAlbums(final Viewer viewer) {
         final Map<UUID, SpexRef> spex = new LinkedHashMap<>();
         final Map<UUID, Integer> counts = new LinkedHashMap<>();
 
-        for (final Album album : visibleAlbums()) {
+        for (final Album album : visibleAlbums(viewer)) {
             album.getSpex().stream().map(SpexRef::getId).distinct().forEach(id -> counts.merge(id, 1, Integer::sum));
             album.getSpex().forEach(ref -> spex.putIfAbsent(ref.getId(), ref));
         }

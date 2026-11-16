@@ -3,7 +3,28 @@ logging:
     path: ./build/integrationtest-data/log_data
 
 spexgram:
+  # Scheduled jobs never fire on their own in tests: a test that needs one calls it, so a run at
+  # the wrong minute can't hold its lock or change data mid-test
+  jobs:
+    spex-refresh:
+      cron-expression: '-'
+    spexipedia-sync:
+      cron-expression: '-'
+    unsorted-scan:
+      cron-expression: '-'
+    processing-poll:
+      cron-expression: '-'
+    item-check:
+      cron-expression: '-'
+    upload-cleanup:
+      cron-expression: '-'
+    retention:
+      cron-expression: '-'
+    contribution-mail:
+      cron-expression: '-'
   web-url: https://spexgram.test
+  # The audience fgv-spexgram-mcp's tokens have in the realm copy (SPEXGRAM_MCP_URL's default)
+  base-url: http://localhost:8085
   media:
     base-url: https://media.spexgram.test
     # Not a real key: the tests check the signatures with it
