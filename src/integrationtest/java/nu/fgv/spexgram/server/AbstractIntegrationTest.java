@@ -273,7 +273,7 @@ public abstract class AbstractIntegrationTest {
         try (Keycloak admin = KEYCLOAK.getKeycloakAdminClient()) {
             final RealmResource realm = admin.realm(REALM);
 
-            grantClientRoles(realm, createUser(realm, email, "Spexregister", List.of()), "spexregister", List.of("USER"));
+            grantClientRoles(realm, createUser(realm, email, "Spexregister", List.of()), "fgv-spexregister", List.of("USER"));
         }
     }
 
