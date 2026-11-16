@@ -158,8 +158,8 @@ public class ItemViews {
         final Instant expires = context.expires();
         final boolean video = item.getType() == ItemType.VIDEO;
         // Immich plays the original when it has no browser version; that, with its location, only for those who may
-        // download originals
-        final boolean playable = context.viewer().kind() != Viewer.Kind.SPEXIPEDIA && (item.isTranscoded() || context.originals());
+        // download originals. Spexipedia shows short videos on its pages, but only their browser versions.
+        final boolean playable = item.isTranscoded() || context.originals() && context.viewer().kind() != Viewer.Kind.SPEXIPEDIA;
 
         return new MediaDto(signer.sign(asset, MediaSigner.Variant.THUMBNAIL, expires),
                 signer.sign(asset, MediaSigner.Variant.PREVIEW, expires),

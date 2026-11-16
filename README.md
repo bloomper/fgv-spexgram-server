@@ -8,7 +8,12 @@ made public, and plain HTTP endpoints for resumable (tus) uploads and albums as 
 by [Immich][11], which runs headless behind the API: the API sets it up, sends it uploads, follows its processing and
 decides who may see what. The media server (`spexgram-media`, nginx) serves Immich's thumbnails, previews, originals
 and videos from signed, expiring addresses. It is backed by MySQL and Keycloak ([fgv-keycloak][1]) for authentication,
-and reads spex from Spexregister. [Spexgram Web][2] is its frontend and [fgv-spexgram-deploy][3] runs it on a server.
+and reads spex from Spexipedia. [Spexgram Web][2] is its frontend and [fgv-spexgram-deploy][3] runs it on a server.
+
+It also has a narrow, read-only MCP server at `/api/mcp`, for AI assistants: it lists, searches and describes the
+public albums and the spex they are about, as for a visitor whoever is signed in, and never the photos, videos or
+people themselves. Only tokens of the Keycloak client `fgv-spexgram-mcp` are accepted there; `getting-started.adoc`
+describes it.
 
 The product spec is in [fgv-spexgram-spec][4].
 
@@ -21,7 +26,7 @@ test credentials. The GraphQL schema is `src/main/resources/graphql/schema.graph
 
 ## Immich
 
-Immich is pinned to **v3.3.6**. Its client (`immich/ImmichClient`) is written by hand for the twenty-odd endpoints
+Immich is pinned to **v3.4.1**. Its client (`immich/ImmichClient`) is written by hand for the twenty-odd endpoints
 Spexgram uses rather than generated: the OpenAPI document has several hundred operations, and Spexgram reads Immich's
 large system configuration as a tree it changes a few values in. The pinned version's document is checked in as
 `src/main/resources/immich/immich-openapi-specs.json`, and `ImmichClientContractTest` checks that every endpoint,

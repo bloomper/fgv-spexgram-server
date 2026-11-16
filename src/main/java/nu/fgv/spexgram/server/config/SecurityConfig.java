@@ -17,6 +17,8 @@
 package nu.fgv.spexgram.server.config;
 
 import nu.fgv.spexgram.server.util.security.KeycloakJwtRolesConverter;
+import org.springaicommunity.mcp.security.server.config.McpServerOAuth2Configurer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
@@ -27,17 +29,28 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtAudienceValidator;
 import org.springframework.security.oauth2.jwt.JwtClaimValidator;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.SupplierJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.DelegatingJwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.util.List;
 
 /**
- * A stateless JWT resource server bound to {@code fgv-spexgram} tokens (and Spexipedia's service account). GraphQL is
- * open at HTTP level because the services decide access.
+ * Two stateless JWT resource-server chains: one for MCP, bound to {@code fgv-spexgram-mcp} tokens with the MCP URL as
+ * audience, and one for the rest, bound to {@code fgv-spexgram} tokens (and Spexipedia's service account). GraphQL is
+ * open at HTTP level because the services decide access. The MCP tools show only what visitors see, so its tokens need
+ * no roles and the caller is never recorded.
  *
  * @author Anders Jacobsson
  * @since 1.0
@@ -48,6 +61,46 @@ public class SecurityConfig {
 
     @Bean
     @Order(1)
+    public SecurityFilterChain mcpSecurityFilterChain(final HttpSecurity http,
+                                                      @Value("${spring.ai.mcp.server.streamable-http.mcp-endpoint}") final String mcpEndpoint,
+                                                      @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") final String issuerUri,
+                                                      @Value("${spexgram.mcp.authorized-parties}") final List<String> authorizedParties,
+                                                      @Value("${spexgram.base-url}") final String baseUrl,
+                                                      final JwtAuthenticationConverter jwtAuthenticationConverter) {
+        final String resource = UriComponentsBuilder.fromUriString(baseUrl).replacePath(mcpEndpoint).build().toUriString();
+        final JwtDecoder jwtDecoder = new SupplierJwtDecoder(() -> {
+            final NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
+
+            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                    JwtValidators.createDefaultWithIssuer(issuerUri),
+                    new JwtAudienceValidator(resource),
+                    new JwtClaimValidator<String>("azp", authorizedParties::contains),
+                    accessTokenTypeValidator()
+            ));
+            return decoder;
+        });
+
+        http
+                .securityMatcher(mcpEndpoint, "/.well-known/oauth-protected-resource/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(authorize ->
+                        authorize
+                                .requestMatchers(HttpMethod.GET, "/.well-known/oauth-protected-resource/**").permitAll()
+                                .anyRequest().authenticated()
+                )
+                .with(McpServerOAuth2Configurer.mcpServerOAuth2(), mcp -> mcp
+                        .authorizationServer(issuerUri)
+                        .resourcePath(mcpEndpoint)
+                        .resourceName("Spexgram")
+                        .validateAudienceClaim(false)
+                        .jwtDecoder(jwtDecoder))
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     public SecurityFilterChain securityFilterChain(final HttpSecurity http,
                                                    final JwtAuthenticationConverter jwtAuthenticationConverter) {
         http

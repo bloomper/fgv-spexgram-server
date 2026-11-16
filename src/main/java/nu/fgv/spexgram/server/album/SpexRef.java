@@ -27,8 +27,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A spex an album is about, by its id in Spexregister, with its title, year and category copied so that the
- * archive works while Spexregister is unavailable. Refreshed daily. A revival keeps the id of its original.
+ * A spex an album is about, by its id in Spexipedia, with its title, year and category copied so that the
+ * archive works while Spexipedia is unavailable. Kept current from its change feed. A revival keeps the id of its original.
  *
  * @author Anders Jacobsson
  * @since 1.0

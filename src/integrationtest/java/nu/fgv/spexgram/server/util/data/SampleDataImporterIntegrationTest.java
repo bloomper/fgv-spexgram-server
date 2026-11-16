@@ -28,10 +28,9 @@ import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * The sample data (5.9 of the spec) is built on Spexregister's spex and sample users, who get roles here, and its
+ * The sample data (5.9 of the spec) is built on Spexipedia's spex and fgv-infra-deploy's sample users, by their fixed ids, and its
  * generated files go through Immich's real upload and processing.
  *
  * @author Anders Jacobsson
@@ -43,13 +42,13 @@ class SampleDataImporterIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private SampleDataImporter importer;
 
-    private static void spexregisterWithSpex() {
+    private static void spexipediaWithSpex() {
         WIREMOCK.stubFor(post(urlEqualTo("/api/graphql")).withRequestBody(containing("AllSpex"))
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
-                        {"data": {"spexPaged": {"edges": [
-                            {"node": {"id": "00000000-0000-7000-8000-000000000001", "year": "1975", "title": "Nobel", "revival": false, "parent": null, "category": {"id": "00000000-0000-7000-8000-000000000002", "name": "Chalmersspexet"}}},
-                            {"node": {"id": "00000000-0000-7000-8000-000000000003", "year": "2024", "title": "Cleopatra", "revival": false, "parent": null, "category": {"id": "00000000-0000-7000-8000-000000000002", "name": "Chalmersspexet"}}}
-                        ]}}}""")));
+                        {"data": {"spexAll": [
+                            {"id": "00000000-0000-7000-8000-000000000001", "year": "1975", "title": "Nobel", "revival": false, "retired": false, "parent": null, "poster": null, "category": {"id": "00000000-0000-7000-8000-000000000002", "name": "Chalmersspexet"}},
+                            {"id": "00000000-0000-7000-8000-000000000003", "year": "2024", "title": "Cleopatra", "revival": false, "retired": false, "parent": null, "poster": null, "category": {"id": "00000000-0000-7000-8000-000000000002", "name": "Chalmersspexet"}}
+                        ]}}""")));
     }
 
     private long count(final String sql) {
@@ -57,27 +56,16 @@ class SampleDataImporterIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @Order(1)
-    void refusesWithoutSpexregistersSampleUsers() {
-        spexregisterWithSpex();
-
-        assertThatThrownBy(() -> importer.importSampleData()).hasMessageContaining("Spexregister's sample user");
-    }
-
-    @Test
     @Order(2)
-    void buildsAnArchiveOnSpexregistersSpexInImmichAndGivesItsUsersRoles() throws Exception {
-        createSpexregisterUser(SampleDataImporter.ADMIN);
-        createSpexregisterUser(SampleDataImporter.EDITOR);
-        createSpexregisterUser(SampleDataImporter.USER);
-        spexregisterWithSpex();
+    void buildsAnArchiveOnSpexipediasSpexInImmichAndRecordsTheSampleUsers() throws Exception {
+        spexipediaWithSpex();
 
         importer.importSampleData();
 
-        assertThat(spexgramRoles(SampleDataImporter.ADMIN)).containsExactly("ADMIN", "EDITOR", "USER");
-        assertThat(spexgramRoles(SampleDataImporter.EDITOR)).containsExactly("EDITOR", "USER");
-        assertThat(spexgramRoles(SampleDataImporter.USER)).containsExactly("USER");
-        assertThat(spexgramRoles(SampleDataImporter.NO_ACCESS)).isEmpty();
+        // fgv-infra-deploy's sample users, recorded by their fixed ids without asking Keycloak
+        assertThat(jdbcClient.sql("SELECT subject FROM app_user ORDER BY subject").query(String.class).list()).containsExactly(
+                "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002",
+                "00000000-0000-4000-8000-000000000003", "00000000-0000-4000-8000-000000000005");
 
         // 15 albums and a suggested one; 20 photos each, 4 videos (the text file is rejected), 6 unsorted, 5 contributions
         assertThat(count("SELECT COUNT(*) FROM album")).isEqualTo(16);

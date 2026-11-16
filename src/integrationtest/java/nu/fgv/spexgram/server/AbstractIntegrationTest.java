@@ -106,8 +106,9 @@ public abstract class AbstractIntegrationTest {
     protected static final String NO_ACCESS = "utan" + DOMAIN;
     protected static final String PASSWORD = "s3cr3t-s3cr3t";
     protected static final String CLIENT_ID = "fgv-spexgram";
+    protected static final String MCP_CLIENT_ID = "fgv-spexgram-mcp";
     protected static final String SPEX_ID = "00000000-0000-7000-8000-000000000001";
-    protected static final String IMMICH_VERSION = "v3.3.6";
+    protected static final String IMMICH_VERSION = "v3.4.1";
     protected static final WireMockServer WIREMOCK = new WireMockServer(options().dynamicPort());
     protected static final Path DATA = Path.of("build/integrationtest-data").toAbsolutePath();
     private static final String REALM = "fgv";
@@ -132,7 +133,7 @@ public abstract class AbstractIntegrationTest {
             .withSharedMemorySize(128L * 1024 * 1024)
             .withTmpFs(Map.of("/var/lib/postgresql/data", "rw"));
     private static final GenericContainer<?> IMMICH_VALKEY = new GenericContainer<>(
-            "docker.io/valkey/valkey:9@sha256:c123e3715db63d06d4ad6964884037aa0d5d4d703939b9929954112889708e1d")
+            "docker.io/valkey/valkey:9@sha256:418652cfb58ef879d4978c33553735d7147016032d5aefaa14c828e611eb9dfd")
             .withNetwork(IMMICH_NETWORK)
             .withNetworkAliases("immich-valkey");
     private static final GenericContainer<?> IMMICH = new GenericContainer<>("ghcr.io/immich-app/immich-server:" + IMMICH_VERSION)
@@ -166,9 +167,10 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri", () -> KEYCLOAK.getAuthServerUrl() + "/realms/" + REALM);
         registry.add("spexgram.keycloak.url", KEYCLOAK::getAuthServerUrl);
         registry.add("spexgram.keycloak.service-client-secret", () -> SECRETS.get("fgv-spexgram-service"));
-        registry.add("spexgram.keycloak.admin-client-secret", () -> SECRETS.get("fgv-admin"));
         registry.add("spexgram.immich.url", AbstractIntegrationTest::immichUrl);
-        registry.add("spexgram.spexregister.graphql-url", () -> WIREMOCK.baseUrl() + "/api/graphql");
+        registry.add("spexgram.spexipedia.graphql-url", () -> WIREMOCK.baseUrl() + "/api/graphql");
+        // Tests pull the feed themselves
+        registry.add("spexgram.spexipedia.sync-enabled", () -> "false");
         registry.add("spexgram.turnstile.verify-url", () -> WIREMOCK.baseUrl() + "/turnstile/v0/siteverify");
         registry.add("spring.mail.host", () -> "localhost");
         registry.add("spring.mail.port", () -> SMTP_PORT);
@@ -215,6 +217,12 @@ public abstract class AbstractIntegrationTest {
 
             web.setDirectAccessGrantsEnabled(true);
             realm.clients().get(web.getId()).update(web);
+
+            final ClientRepresentation mcp = realm.clients().findByClientId(MCP_CLIENT_ID).getFirst();
+
+            mcp.setDirectAccessGrantsEnabled(true);
+            mcp.setConsentRequired(false);
+            realm.clients().get(mcp.getId()).update(mcp);
 
             createUser(realm, VIEWER, "Lisa", List.of("USER"));
             createUser(realm, EDITOR, "Erik", List.of("USER", "EDITOR"));
@@ -265,7 +273,7 @@ public abstract class AbstractIntegrationTest {
         try (Keycloak admin = KEYCLOAK.getKeycloakAdminClient()) {
             final RealmResource realm = admin.realm(REALM);
 
-            grantClientRoles(realm, createUser(realm, email, "Spexregister", List.of()), "spexregister", List.of("USER"));
+            grantClientRoles(realm, createUser(realm, email, "Spexregister", List.of()), "fgv-spexregister", List.of("USER"));
         }
     }
 
@@ -302,11 +310,42 @@ public abstract class AbstractIntegrationTest {
         return "Bearer " + tokens(user).get("id_token");
     }
 
+    /**
+     * A service account's access token, by client credentials, e.g. {@code fgv-spexipedia-service}.
+     */
+    protected static String serviceToken(final String clientId) {
+        return TOKENS.computeIfAbsent("client:" + clientId, _ -> {
+            final MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+
+            Map.of("grant_type", "client_credentials", "client_id", clientId, "client_secret", SECRETS.get(clientId)).forEach(form::add);
+            return "Bearer " + JSON.parseMap(RestClient.create()
+                    .post()
+                    .uri(KEYCLOAK.getAuthServerUrl() + "/realms/" + REALM + "/protocol/openid-connect/token")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(form)
+                    .retrieve()
+                    .body(String.class)).get("access_token");
+        });
+    }
+
+    /**
+     * A user's access token from {@code fgv-spexgram-mcp}, the public client MCP clients use, by password grant.
+     */
+    protected static String mcpToken(final String user) {
+        return TOKENS.computeIfAbsent("mcp:" + user, _ -> "Bearer " + tokens(user, MCP_CLIENT_ID).get("access_token"));
+    }
+
     private static Map<String, Object> tokens(final String user) {
+        return tokens(user, CLIENT_ID);
+    }
+
+    private static Map<String, Object> tokens(final String user, final String clientId) {
         final MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
 
-        Map.of("grant_type", "password", "client_id", CLIENT_ID, "client_secret", SECRETS.get(CLIENT_ID),
-                "username", user, "password", PASSWORD, "scope", "openid").forEach(form::add);
+        Map.of("grant_type", "password", "client_id", clientId, "username", user, "password", PASSWORD, "scope", "openid").forEach(form::add);
+        if (SECRETS.containsKey(clientId)) {
+            form.add("client_secret", SECRETS.get(clientId));
+        }
 
         final String response = RestClient.create()
                 .post()
@@ -329,7 +368,7 @@ public abstract class AbstractIntegrationTest {
     }
 
     /**
-     * Spexregister answering with spex {@value #SPEX_ID}, Cleopatra 2024, and Turnstile accepting every token but
+     * Spexipedia answering with spex {@value #SPEX_ID}, Cleopatra 2024, and Turnstile accepting every token but
      * {@code bad}.
      */
     protected static void stubsUp() {
@@ -337,7 +376,8 @@ public abstract class AbstractIntegrationTest {
         WIREMOCK.stubFor(post(urlEqualTo("/api/graphql"))
                 .withRequestBody(containing("SpexById"))
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
-                        {"data": {"spex": {"id": "00000000-0000-7000-8000-000000000001", "year": "2024", "title": "Cleopatra", "revival": false, "parent": null,
+                        {"data": {"spex": {"id": "00000000-0000-7000-8000-000000000001", "year": "2024", "title": "Cleopatra", "revival": false,
+                                           "retired": false, "parent": null, "poster": null,
                                            "category": {"id": "00000000-0000-7000-8000-000000000002", "name": "Chalmersspexet"}}}}""")));
         WIREMOCK.stubFor(post(urlEqualTo("/turnstile/v0/siteverify"))
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("{\"success\": true, \"hostname\": \"spexgram.test\"}")));
@@ -354,7 +394,7 @@ public abstract class AbstractIntegrationTest {
         reportLimiter.clear();
         jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 0").update();
         for (final String table : List.of("audit_entry", "report", "contribution_review", "album_suggestion", "album_spex", "item",
-                "album", "upload_session", "app_user")) {
+                "album", "upload_session", "app_user", "spexipedia_category")) {
             jdbcClient.sql("TRUNCATE TABLE " + table).update();
         }
         jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 1").update();
@@ -375,12 +415,16 @@ public abstract class AbstractIntegrationTest {
     }
 
     protected HttpGraphQlTester graphQl(final @Nullable String user) {
+        return graphQlWithToken(user == null ? null : token(user));
+    }
+
+    protected HttpGraphQlTester graphQlWithToken(final @Nullable String token) {
         return HttpGraphQlTester.create(WebTestClient.bindToServer()
                 .baseUrl("http://localhost:%d/api/graphql".formatted(localPort))
                 .responseTimeout(Duration.ofSeconds(120))
                 .defaultHeaders(headers -> {
-                    if (user != null) {
-                        headers.set(HttpHeaders.AUTHORIZATION, token(user));
+                    if (token != null) {
+                        headers.set(HttpHeaders.AUTHORIZATION, token);
                     }
                     headers.set(HttpHeaders.ACCEPT_LANGUAGE, "en");
                 })

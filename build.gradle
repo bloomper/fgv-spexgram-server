@@ -56,6 +56,7 @@ repositories {
 }
 
 ext {
+    set('springAiVersion', '2.0.1')
     set('snippetsDir', file('build/generated-snippets'))
 }
 
@@ -78,6 +79,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
+    implementation 'org.springaicommunity:mcp-server-security:0.1.14'
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-mysql'
     implementation 'com.github.ben-manes.caffeine:caffeine'
@@ -122,6 +125,7 @@ dependencies {
 dependencyManagement {
     imports {
         mavenBom 'org.testcontainers:testcontainers-bom:2.0.5'
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
     }
 }
 

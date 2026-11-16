@@ -208,7 +208,14 @@ public class ItemService {
      */
     @Transactional(readOnly = true)
     public Map<UUID, Integer> itemCounts(final Collection<UUID> albumIds) {
-        final Viewer viewer = viewerService.currentForSpexipedia();
+        return itemCounts(albumIds, viewerService.currentForSpexipedia());
+    }
+
+    /**
+     * How many items of each album the given viewer may see, e.g. {@link Viewer#visitor()} for MCP.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, Integer> itemCounts(final Collection<UUID> albumIds, final Viewer viewer) {
         final List<Album> albums = albumIds.isEmpty() ? List.of() : albumRepository.findByUuidIn(albumIds);
         // One query for the whole page of albums, which visitors can ask for 50 at a time (editors 500)
         final Map<Long, Long> byId = repository.countByAlbum(ItemSpecifications.visibleTo(viewer), albums);

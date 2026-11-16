@@ -48,6 +48,26 @@ spring:
         enabled: false
     http:
       path: /api/graphql
+  ai:
+    mcp:
+      server:
+        name: fgv-spexgram
+        version: 1.0.0
+        type: SYNC
+        protocol: STATELESS
+        streamable-http:
+          mcp-endpoint: /api/mcp
+        capabilities:
+          resource: false
+          prompt: false
+          completion: false
+        instructions: >-
+          Spexgram is FGV's archive of photos and short videos from the spex, organised in albums. These tools list
+          only the public albums, what anyone sees without logging in, whoever is signed in: an album's title, spex,
+          year, dates, place, description, how many public items it has and a link to its page in Spexgram. They never
+          return the photos and videos themselves, nor who is in them, and change nothing. A spex is a show of
+          Chalmersspexet or another FGV spex, by title and year; revivals are listed with their year and the
+          original they revive.
 
 management:
   server:
@@ -75,9 +95,13 @@ logging:
 spexgram:
   time-zone: Europe/Stockholm
   web-url: ${API_WEB_URL:http://localhost:3004}
+  # The API's public address, whose /api/mcp is the audience MCP tokens must have
+  base-url: ${API_BASE_URL:https://api.spexgram.fgv.local.nu:8443}
   jobs:
     spex-refresh:
       cron-expression: 0 15 3 * * * # Every day at 03:15
+    spexipedia-sync:
+      cron-expression: 0 */5 * * * * # Every five minutes
     unsorted-scan:
       cron-expression: 0 */5 * * * * # Every five minutes
     processing-poll:
@@ -95,13 +119,13 @@ spexgram:
     realm: ${API_KEYCLOAK_REALM:fgv}
     service-client-id: ${API_KEYCLOAK_SERVICE_CLIENT_ID:fgv-spexgram-service}
     service-client-secret: ${API_KEYCLOAK_SERVICE_CLIENT_SECRET:}
-    # Only for the sample data import, which grants roles
-    admin-client-id: ${API_KEYCLOAK_ADMIN_CLIENT_ID:fgv-admin}
-    admin-client-secret: ${API_KEYCLOAK_ADMIN_CLIENT_SECRET:}
   security:
     authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexgram,fgv-spexipedia-service}
     # Shared with the web, which sends it with the visitor's address (X-Client-IP)
     client-ip-secret: ${API_CLIENT_IP_SECRET:}
+  mcp:
+    # The clients (azp) whose tokens the MCP endpoint accepts, and only it
+    authorized-parties: ${API_KEYCLOAK_MCP_CLIENT_ID:fgv-spexgram-mcp}
   media:
     # The DNS-only media hostname served by spexgram-media (nginx)
     base-url: ${API_MEDIA_BASE_URL:https://media.spexgram.fgv.local.nu:8443}
@@ -126,13 +150,13 @@ spexgram:
     verify-url: https://challenges.cloudflare.com/turnstile/v0/siteverify
   mail:
     from: ${MAIL_FROM:noreply@localhost}
-  spexregister:
-    graphql-url: ${API_SPEXREGISTER_GRAPHQL_URL:https://api.register.fgv.local.nu:8443/api/graphql}
+  spexipedia:
+    graphql-url: ${API_SPEXIPEDIA_GRAPHQL_URL:https://api.spexipedia.fgv.local.nu:8443/api/graphql}
+    web-url: ${SPEXIPEDIA_WEB_URL:}
+    sync-enabled: ${API_SPEXIPEDIA_SYNC_ENABLED:true}
   data:
     import-sample-data: ${API_IMPORT_SAMPLE_DATA:false}
     sample-data-size: ${API_SAMPLE_DATA_SIZE:small}
-    # Needed only to import sample data; the local profile has a development value
-    sample-user-password: ${SAMPLE_USER_PASSWORD:}
 
 ---
 spring:
@@ -159,9 +183,6 @@ management:
     port: 9005
 
 spexgram:
-  data:
-    # For development only; every other environment sets SAMPLE_USER_PASSWORD
-    sample-user-password: ${SAMPLE_USER_PASSWORD:s3cr3t-s3cr3t}
   keycloak:
     url: https://auth.fgv.local.nu:8443/auth
   media:

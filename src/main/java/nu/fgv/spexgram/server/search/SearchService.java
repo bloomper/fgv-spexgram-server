@@ -116,16 +116,45 @@ public class SearchService {
             return new SearchResult(List.of(), List.of());
         }
 
-        final List<Long> albums = jdbcClient.sql("""
-                        SELECT id FROM album WHERE MATCH(title, place, description) AGAINST (:q IN BOOLEAN MODE)
-                        ORDER BY MATCH(title, place, description) AGAINST (:q IN BOOLEAN MODE) DESC LIMIT :limit""")
-                .param("q", query).param("limit", CANDIDATES).query(Long.class).list();
+        final List<Long> albums = albumCandidates(query);
         final List<Long> items = jdbcClient.sql("""
                         SELECT id FROM item WHERE MATCH(caption, photographer) AGAINST (:q IN BOOLEAN MODE)
                         ORDER BY MATCH(caption, photographer) AGAINST (:q IN BOOLEAN MODE) DESC LIMIT :limit""")
                 .param("q", query).param("limit", CANDIDATES).query(Long.class).list();
 
         return new SearchResult(albumService.visibleAmong(albums, viewer, max), itemService.visibleAmong(items, viewer, null, max));
+    }
+
+    /**
+     * Albums whose titles, places or descriptions match the words, best match first, within the filter, as the given
+     * viewer sees them, e.g. {@link Viewer#visitor()} for MCP. Blank words match every album in the filter, newest
+     * first.
+     */
+    @Transactional(readOnly = true)
+    public List<AlbumDto> albums(final @Nullable String q, final @Nullable AlbumFilter filter, final Viewer viewer, final int limit) {
+        final int max = Math.clamp(limit, 1, MAX_LIMIT);
+
+        if (q == null || q.isBlank()) {
+            return albumService.albums(filter, 0, max, viewer).albums();
+        }
+
+        final String query = booleanQuery(q);
+
+        if (query == null) {
+            return List.of();
+        }
+
+        final @Nullable Set<Long> within = filter == null ? null : albumService.albumIds(filter, viewer);
+        final List<Long> candidates = albumCandidates(query).stream().filter(id -> within == null || within.contains(id)).toList();
+
+        return albumService.visibleAmong(candidates, viewer, max);
+    }
+
+    private List<Long> albumCandidates(final String query) {
+        return jdbcClient.sql("""
+                        SELECT id FROM album WHERE MATCH(title, place, description) AGAINST (:q IN BOOLEAN MODE)
+                        ORDER BY MATCH(title, place, description) AGAINST (:q IN BOOLEAN MODE) DESC LIMIT :limit""")
+                .param("q", query).param("limit", CANDIDATES).query(Long.class).list();
     }
 
     /**

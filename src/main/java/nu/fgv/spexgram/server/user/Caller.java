@@ -55,6 +55,10 @@ public record Caller(String subject, String username, @Nullable String displayNa
         return roles.contains(Role.SPEXIPEDIA);
     }
 
+    public boolean isNotifier() {
+        return roles.contains(Role.NOTIFY);
+    }
+
     public void requireUser() {
         if (!isUser()) {
             throw new AccessDeniedException("USER required");
