@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Local development only: sets this application up against the Keycloak of fgv-infra-deploy's local stack. Copies the
-# secrets of the clients the API uses (the admin client and, where the application has one, its service client) from
+# secrets of the clients the API uses (its service client) from
 # Keycloak into .docker/secrets, sets the web client's id and secret in the web's .env.local, and allows Postman's
 # callback URL. Run scripts/init-secrets.sh for the other secrets. It can be run again.
 set -euo pipefail
@@ -60,7 +60,6 @@ kcadm config credentials \
   --user "$admin" \
   --password "$(cat "$infra_local/.docker/secrets/KEYCLOAK_ADMIN_PASSWORD")"
 
-set_secret API_KEYCLOAK_ADMIN_CLIENT_SECRET "$API_KEYCLOAK_ADMIN_CLIENT_ID"
 if [[ -f .docker/secrets/API_KEYCLOAK_SERVICE_CLIENT_SECRET ]]; then
   set_secret API_KEYCLOAK_SERVICE_CLIENT_SECRET "${API_KEYCLOAK_SERVICE_CLIENT_ID:-$API_KEYCLOAK_CLIENT_CLIENT_ID-service}"
 fi

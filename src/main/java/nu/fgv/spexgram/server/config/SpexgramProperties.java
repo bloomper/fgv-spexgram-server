@@ -47,11 +47,8 @@ public record SpexgramProperties(String timeZone,
     /**
      * @param serviceClientId     {@code fgv-spexgram-service}, which reads editors' email addresses ({@code view-users})
      * @param serviceClientSecret its secret
-     * @param adminClientId       {@code fgv-admin}, only for the sample data import, which grants roles
-     * @param adminClientSecret   its secret
      */
-    public record Keycloak(String url, String realm, String serviceClientId, String serviceClientSecret,
-                           String adminClientId, String adminClientSecret) {
+    public record Keycloak(String url, String realm, String serviceClientId, String serviceClientSecret) {
     }
 
     /**
@@ -104,6 +101,6 @@ public record SpexgramProperties(String timeZone,
     public record Spexipedia(String graphqlUrl, String webUrl, boolean syncEnabled) {
     }
 
-    public record Data(boolean importSampleData, String sampleDataSize, String sampleUserPassword) {
+    public record Data(boolean importSampleData, String sampleDataSize) {
     }
 }

@@ -73,7 +73,6 @@ To set a value by hand, write it without a trailing newline, e.g. ``printf '%s' 
 |FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD|The password for the root user of Spexgram Server's database||verysecret
 |FGV_SPEXGRAM_MYSQL_USER_PASSWORD|The password for the user of Spexgram Server's database||secret
 |API_KEYCLOAK_SERVICE_CLIENT_SECRET|The client secret of ``fgv-spexgram-service``, with which Spexgram Server calls Spexipedia and reads editors' email addresses in Keycloak|Must match the value in ``realm/fgv.json`` in fgv-keycloak, search for ``fgv-spexgram-service`` and pick the value for ``secret`` in the same section|
-|API_KEYCLOAK_ADMIN_CLIENT_SECRET|The client secret of ``fgv-admin``, with which the sample data import gives users roles|Must match the value in ``realm/fgv.json``, search for ``fgv-admin``|
 |API_MEDIA_SIGNING_KEY|Signs the media addresses, which the media server checks; shared by ``spexgram-api`` and ``spexgram-media``|A long random string, e.g. from ``openssl rand -base64 32``|
 |API_IMMICH_ADMIN_PASSWORD|The password of Immich's admin, Spexgram's system user, which the API creates in Immich|A long random string|
 |IMMICH_DB_PASSWORD|The password of Immich's PostgreSQL|Letters and digits only|
@@ -90,7 +89,6 @@ There are also configuration parameters in ``.env`` that can be tweaked if so de
 |FGV_SPEXGRAM_MYSQL_ROOT_USER|The root user of Spexgram Server's database|root
 |FGV_SPEXGRAM_MYSQL_USER|The user of Spexgram Server's database|spexgram
 |API_KEYCLOAK_REALM|The Keycloak realm of Spexgram Server|fgv
-|API_KEYCLOAK_ADMIN_CLIENT_ID|The Keycloak admin client id of Spexgram Server|fgv-admin
 |API_KEYCLOAK_CLIENT_CLIENT_ID|The Keycloak client id of Spexgram Web|fgv-spexgram
 |API_IMPORT_SAMPLE_DATA|A flag determining whether to import sample data or not|false
 |API_SAMPLE_DATA_SIZE|``small`` (about 15 albums and 300 items) or ``large`` (about 300 albums and 20,000 items)|small
@@ -138,7 +136,7 @@ When the ``spexgram-api`` container isn't running, Caddy forwards ``https://api.
 ----
 $ docker compose up -d spexgram-mysql immich-server
 $ MYSQL_API_USER_PASSWORD=<FGV_SPEXGRAM_MYSQL_USER_PASSWORD> \
-  API_KEYCLOAK_SERVICE_CLIENT_SECRET=<…> API_KEYCLOAK_ADMIN_CLIENT_SECRET=<…> API_MEDIA_SIGNING_KEY=<…> \
+  API_KEYCLOAK_SERVICE_CLIENT_SECRET=<…> API_MEDIA_SIGNING_KEY=<…> \
   API_IMMICH_ADMIN_PASSWORD=<…> ./gradlew bootRun --args='--spring.profiles.active=local'
 $ docker compose up -d spexgram-media   # once the API has created data/immich-media-key/media.key
 ----
@@ -171,20 +169,13 @@ Immich's web interface is not part of Spexgram; locally it is at http://localhos
 If ``API_IMPORT_SAMPLE_DATA`` is set to ``true``, the database is replaced, the uploads folder emptied and every asset in Immich deleted at every start (it refuses in the Spring profile ``production``).
 Immich's system user and API keys are kept.
 None of the data can be traced to real individuals, i.e. no personally identifiable information (PII).
-The import needs the secret of ``fgv-admin``.
 
 The sample data is built on Spexipedia's and Spexregister's, so both must run with ``API_IMPORT_SAMPLE_DATA=true``:
 
 * The albums belong to Spexipedia's sample spex, read from its API.
 The import waits up to 5 minutes for Spexipedia.
-* Spexregister's sample users get roles on ``fgv-spexgram`` (see <<test_credentials>>).
-The import refuses to run without them, which keeps it away from real environments.
-
-[sidebar]
-.NOTE
---
-Spexregister's import deletes all Keycloak users at every start, so restart Spexgram Server after Spexregister.
---
+* The sample users are fgv-infra-deploy's (``bin/seed-users.sh``), with their roles on ``fgv-spexgram`` there (see <<test_credentials>>).
+The import records them by their fixed ids and never asks Keycloak, so it needs no admin client and does not wait for Spexregister.
 
 The import generates the files, never real photos: images with the album's title, a number and a coloured pattern (Java2D), with EXIF for the date taken, a position near Chalmers on every third and a rotation by metadata on every seventh, and every tenth as PNG; and videos made with ffmpeg: two in MP4, one in AVI that Immich must transcode, one longer than the maximum length, which is rejected once Immich knows its length, and a text file, which Immich rejects.
 HEIC is left out: ffmpeg, the only encoder in the image, cannot write it.
@@ -198,7 +189,7 @@ The archive has albums of every kind and visibility, with and without spex, capt
 The administrative UI of Keycloak can be accessed at https://auth.fgv.local.nu:8443/auth.
 The username is ``KEYCLOAK_ADMIN`` in fgv-infra-deploy's ``local/.env`` and the password is in its ``local/.docker/secrets/KEYCLOAK_ADMIN_PASSWORD``.
 
-Spexgram uses the clients ``fgv-spexgram`` (the web, and Spexgram's roles ``USER``, ``EDITOR``, ``ADMIN`` and ``SPEXIPEDIA``), ``fgv-spexgram-service`` (``SYNC`` on ``fgv-spexipedia`` for its change feed, and ``realm-management``'s ``view-users`` for editors' email addresses) and ``fgv-admin`` (the sample data's users).
+Spexgram uses the clients ``fgv-spexgram`` (the web, and Spexgram's roles ``USER``, ``EDITOR``, ``ADMIN`` and ``SPEXIPEDIA``) and ``fgv-spexgram-service`` (``SYNC`` on ``fgv-spexipedia`` for its change feed, and ``realm-management``'s ``view-users`` for editors' email addresses).
 
 The integration tests import a copy of ``fgv.json`` at ``src/integrationtest/resources/realm/fgv.json``.
 After every realm change, replace it with the new ``realm/fgv.json`` from fgv-keycloak and commit it.
@@ -237,8 +228,7 @@ $ ./gradlew build              # all of the above, plus this documentation
 [[test_credentials]]
 == Test credentials
 
-The following test users have roles on ``fgv-spexgram`` when sample data is imported (see <<sample_data>>), with the password in ``SAMPLE_USER_PASSWORD`` (``s3cr3t-s3cr3t`` in the ``local`` profile, the same as Spexregister's; every other environment must set it).
-The first three are Spexregister's sample users, which are the same in every FGV application.
+The following test users have roles on ``fgv-spexgram``, from fgv-infra-deploy's ``bin/seed-users.sh`` (``sample-users.tsv``), which creates them, with the same ids and password, in every FGV application: ``s3cr3t-s3cr3t`` locally, its ``secrets/SAMPLE_USER_PASSWORD`` on staging.
 
 |===
 |Username|Roles on ``fgv-spexgram``|Comment
@@ -246,7 +236,7 @@ The first three are Spexregister's sample users, which are the same in every FGV
 |admin@fgv.nu|``USER``, ``EDITOR``, ``ADMIN``|Uploaded the unsorted items
 |editor@fgv.nu|``USER``, ``EDITOR``|Uploaded the albums' items and has made the audit log's changes
 |user@fgv.nu|``USER``|Has contributions waiting for review and an accepted one, an album suggestion, an open and a handled report
-|no-access@fgv.nu|None|Created by the import when missing; sees what a visitor sees
+|no-access@fgv.nu|None|Sees what a visitor sees
 |(not logged in)|-|A visitor: public albums and items; a visitor's report from ``besokare@example.org`` is open
 
 |===

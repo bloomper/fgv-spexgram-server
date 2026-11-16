@@ -20,23 +20,19 @@ package nu.fgv.spexgram.server.config;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 
 /**
- * Two Keycloak admin clients. The service client ({@code fgv-spexgram-service}, {@code view-users}) reads the email
- * addresses of editors and reporters for notifications. The admin client ({@code fgv-admin}) is used only by the sample
- * data import, which grants roles.
+ * Keycloak's admin client as {@code fgv-spexgram-service} ({@code view-users}), which reads the email addresses of
+ * editors and reporters for notifications. Spexgram never administers Keycloak: the sample users are
+ * fgv-infra-deploy's.
  *
  * @author Anders Jacobsson
  * @since 1.0
  */
 @Configuration(proxyBeanMethods = false)
 public class KeycloakConfig {
-
-    public static final String ADMIN = "keycloakAdmin";
 
     private static Keycloak build(final String url, final String realm, final String clientId, final String clientSecret) {
         return KeycloakBuilder.builder()
@@ -49,18 +45,9 @@ public class KeycloakConfig {
     }
 
     @Bean(destroyMethod = "close")
-    @Primary
     public Keycloak keycloakService(final SpexgramProperties properties) {
         final SpexgramProperties.Keycloak keycloak = properties.keycloak();
 
         return build(keycloak.url(), keycloak.realm(), keycloak.serviceClientId(), keycloak.serviceClientSecret());
-    }
-
-    @Bean(name = ADMIN, destroyMethod = "close")
-    @Qualifier(ADMIN)
-    public Keycloak keycloakAdmin(final SpexgramProperties properties) {
-        final SpexgramProperties.Keycloak keycloak = properties.keycloak();
-
-        return build(keycloak.url(), keycloak.realm(), keycloak.adminClientId(), keycloak.adminClientSecret());
     }
 }

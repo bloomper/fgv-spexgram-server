@@ -97,9 +97,6 @@ spexgram:
     realm: ${API_KEYCLOAK_REALM:fgv}
     service-client-id: ${API_KEYCLOAK_SERVICE_CLIENT_ID:fgv-spexgram-service}
     service-client-secret: ${API_KEYCLOAK_SERVICE_CLIENT_SECRET:}
-    # Only for the sample data import, which grants roles
-    admin-client-id: ${API_KEYCLOAK_ADMIN_CLIENT_ID:fgv-admin}
-    admin-client-secret: ${API_KEYCLOAK_ADMIN_CLIENT_SECRET:}
   security:
     authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexgram,fgv-spexipedia-service}
     # Shared with the web, which sends it with the visitor's address (X-Client-IP)
@@ -135,8 +132,6 @@ spexgram:
   data:
     import-sample-data: ${API_IMPORT_SAMPLE_DATA:false}
     sample-data-size: ${API_SAMPLE_DATA_SIZE:small}
-    # Needed only to import sample data; the local profile has a development value
-    sample-user-password: ${SAMPLE_USER_PASSWORD:}
 
 ---
 spring:
@@ -163,9 +158,6 @@ management:
     port: 9005
 
 spexgram:
-  data:
-    # For development only; every other environment sets SAMPLE_USER_PASSWORD
-    sample-user-password: ${SAMPLE_USER_PASSWORD:s3cr3t-s3cr3t}
   keycloak:
     url: https://auth.fgv.local.nu:8443/auth
   media:

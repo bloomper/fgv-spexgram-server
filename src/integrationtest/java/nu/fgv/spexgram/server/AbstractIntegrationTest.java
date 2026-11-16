@@ -166,7 +166,6 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri", () -> KEYCLOAK.getAuthServerUrl() + "/realms/" + REALM);
         registry.add("spexgram.keycloak.url", KEYCLOAK::getAuthServerUrl);
         registry.add("spexgram.keycloak.service-client-secret", () -> SECRETS.get("fgv-spexgram-service"));
-        registry.add("spexgram.keycloak.admin-client-secret", () -> SECRETS.get("fgv-admin"));
         registry.add("spexgram.immich.url", AbstractIntegrationTest::immichUrl);
         registry.add("spexgram.spexipedia.graphql-url", () -> WIREMOCK.baseUrl() + "/api/graphql");
         // Tests pull the feed themselves

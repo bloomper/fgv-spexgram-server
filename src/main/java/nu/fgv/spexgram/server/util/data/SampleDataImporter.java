@@ -17,7 +17,6 @@
 
 package nu.fgv.spexgram.server.util.data;
 
-import jakarta.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
 import nu.fgv.spexgram.server.album.Album;
 import nu.fgv.spexgram.server.album.AlbumKind;
@@ -26,7 +25,6 @@ import nu.fgv.spexgram.server.album.AlbumRepository;
 import nu.fgv.spexgram.server.album.SpexRef;
 import nu.fgv.spexgram.server.audit.AuditEntry;
 import nu.fgv.spexgram.server.audit.AuditEntryRepository;
-import nu.fgv.spexgram.server.config.KeycloakConfig;
 import nu.fgv.spexgram.server.config.SpexgramProperties;
 import nu.fgv.spexgram.server.contribution.AlbumSuggestion;
 import nu.fgv.spexgram.server.contribution.AlbumSuggestionRepository;
@@ -49,16 +47,8 @@ import nu.fgv.spexgram.server.spex.SpexipediaClient;
 import nu.fgv.spexgram.server.upload.UploadService;
 import nu.fgv.spexgram.server.user.AppUser;
 import nu.fgv.spexgram.server.user.AppUserRepository;
-import nu.fgv.spexgram.server.util.security.SecurityUtil;
 import nu.fgv.spexgram.server.visibility.Visibility;
 import org.jspecify.annotations.Nullable;
-import org.keycloak.admin.client.Keycloak;
-import org.keycloak.admin.client.resource.ClientResource;
-import org.keycloak.admin.client.resource.RealmResource;
-import org.keycloak.representations.idm.CredentialRepresentation;
-import org.keycloak.representations.idm.RoleRepresentation;
-import org.keycloak.representations.idm.UserRepresentation;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
@@ -68,7 +58,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.FileSystemUtils;
-import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -93,8 +82,9 @@ import java.util.UUID;
 /**
  * Replaces everything with sample data at every start while {@code spexgram.data.import-sample-data} is set (5.9 of the
  * spec): the database, the uploads folder and every asset in Immich (Immich's system user and API keys are kept).
- * Built on Spexregister's sample spex and users, so Spexregister must run with its sample data too; refuses to run in
- * the {@code production} profile.
+ * Built on Spexipedia's sample spex, so Spexipedia must run with its sample data too, and on fgv-infra-deploy's sample
+ * users (bin/seed-users.sh), which it refers to by their fixed ids without asking Keycloak; refuses to run in the
+ * {@code production} profile.
  *
  * <p>The files are generated ({@link SampleMedia}) and go through Immich's real upload and processing. The archive has
  * albums of every kind and visibility, with and without spex, a public item in an album for members, unpublished and
@@ -108,7 +98,7 @@ import java.util.UUID;
 @Component
 public class SampleDataImporter {
 
-    // Spexregister's sample users, which its sample data import creates; they get roles here
+    // The sample users of fgv-infra-deploy's bin/seed-users.sh, by their fixed ids (see createUsers)
     static final String ADMIN = "admin@fgv.nu";
     static final String EDITOR = "editor@fgv.nu";
     static final String USER = "user@fgv.nu";
@@ -135,7 +125,6 @@ public class SampleDataImporter {
     private final TransactionTemplate transactionTemplate;
     private final SpexipediaClient spexipediaClient;
     private final SpexService spexService;
-    private final Keycloak keycloak;
     private final ImmichBootstrap immichBootstrap;
     private final ImmichClient immichClient;
     private final ItemProcessing processing;
@@ -154,7 +143,7 @@ public class SampleDataImporter {
     @SuppressWarnings("java:S107")
     public SampleDataImporter(final SpexgramProperties properties, final Environment environment, final JdbcTemplate jdbcTemplate,
                               final TransactionTemplate transactionTemplate, final SpexipediaClient spexipediaClient,
-                              final SpexService spexService, @Qualifier(KeycloakConfig.ADMIN) final Keycloak keycloak,
+                              final SpexService spexService,
                               final ImmichBootstrap immichBootstrap, final ImmichClient immichClient,
                               final ItemProcessing processing, final UploadService uploadService,
                               final SettingsService settingsService, final AlbumRepository albumRepository,
@@ -169,7 +158,6 @@ public class SampleDataImporter {
         this.transactionTemplate = transactionTemplate;
         this.spexipediaClient = spexipediaClient;
         this.spexService = spexService;
-        this.keycloak = keycloak;
         this.immichBootstrap = immichBootstrap;
         this.immichClient = immichClient;
         this.processing = processing;
@@ -184,12 +172,6 @@ public class SampleDataImporter {
         this.suggestionRepository = suggestionRepository;
         this.auditRepository = auditRepository;
         this.clock = clock;
-    }
-
-    private static UserRepresentation spexregisterUser(final RealmResource realm, final String email) {
-        return realm.users().searchByEmail(email, true).stream().findFirst()
-                .orElseThrow(() -> new IllegalStateException("Spexregister's sample user " + email
-                        + " is missing; start Spexregister with its sample data first"));
     }
 
     private static UUID uuid(final String kind, final int n) {
@@ -229,8 +211,7 @@ public class SampleDataImporter {
         deleteAllAssets();
 
         final List<SpexDto> spex = spexWithRetry();
-        final RealmResource realm = keycloak.realm(properties.keycloak().realm());
-        final Map<String, AppUser> users = NotificationSuspender.whileSuspended(realm, () -> createUsers(realm));
+        final Map<String, AppUser> users = createUsers();
         final List<AlbumKind> kinds = Objects.requireNonNull(transactionTemplate.execute(_ -> createKinds()));
         final Path folder = Files.createTempDirectory("spexgram-sample-");
 
@@ -314,78 +295,31 @@ public class SampleDataImporter {
     // ---------------------------------------------------------------------------------------------- users and kinds
 
     /**
-     * Gives Spexregister's sample users {@code admin@fgv.nu}, {@code editor@fgv.nu} and {@code user@fgv.nu} the roles
-     * of the same name on this client, and creates {@code no-access@fgv.nu}, without roles, when it is missing. Refuses
-     * without Spexregister's sample users, which keeps the import away from real environments.
+     * The sample users, which fgv-infra-deploy's bin/seed-users.sh creates in Keycloak with fixed ids and their roles on
+     * this client (sample-users.tsv): {@value #ADMIN}, {@value #EDITOR}, {@value #USER}, and {@value #NO_ACCESS} without
+     * roles. They are recorded here by those ids, without asking Keycloak.
      */
-    private Map<String, AppUser> createUsers(final RealmResource realm) {
-        final ClientResource client = realm.clients().get(realm.clients().findByClientId(SecurityUtil.CLIENT_ID).getFirst().getId());
-        final String clientUuid = client.toRepresentation().getId();
+    private Map<String, AppUser> createUsers() {
         final Map<String, AppUser> users = new LinkedHashMap<>();
 
-        users.put(ADMIN, grant(realm, client, clientUuid, spexregisterUser(realm, ADMIN), "USER", "EDITOR", "ADMIN"));
-        users.put(EDITOR, grant(realm, client, clientUuid, spexregisterUser(realm, EDITOR), "USER", "EDITOR"));
-        users.put(USER, grant(realm, client, clientUuid, spexregisterUser(realm, USER), "USER"));
-        users.put(NO_ACCESS, recordUser(noAccessUser(realm)));
+        users.put(ADMIN, recordUser("00000000-0000-4000-8000-000000000001", ADMIN, "Admin"));
+        users.put(EDITOR, recordUser("00000000-0000-4000-8000-000000000002", EDITOR, "Editor"));
+        users.put(USER, recordUser("00000000-0000-4000-8000-000000000003", USER, "User"));
+        users.put(NO_ACCESS, recordUser("00000000-0000-4000-8000-000000000005", NO_ACCESS, "No"));
         return users;
     }
 
-    private AppUser grant(final RealmResource realm, final ClientResource client, final String clientUuid,
-                          final UserRepresentation user, final String... roles) {
-        final List<RoleRepresentation> representations = Arrays.stream(roles)
-                .map(role -> client.roles().get(role).toRepresentation())
-                .toList();
-
-        realm.users().get(user.getId()).roles().clientLevel(clientUuid).add(representations);
-        return recordUser(user);
-    }
-
-    private AppUser recordUser(final UserRepresentation representation) {
+    private AppUser recordUser(final String subject, final String email, final String displayName) {
         final Instant now = clock.instant();
         final AppUser user = new AppUser();
 
-        user.setSubject(representation.getId());
-        user.setUsername(representation.getUsername());
-        user.setDisplayName(representation.getFirstName());
-        user.setEmail(representation.getEmail());
+        user.setSubject(subject);
+        user.setUsername(email);
+        user.setDisplayName(displayName);
+        user.setEmail(email);
         user.setCreatedAt(now);
         user.setLastSeenAt(now);
         return Objects.requireNonNull(transactionTemplate.execute(_ -> userRepository.save(user)));
-    }
-
-    private UserRepresentation noAccessUser(final RealmResource realm) {
-        final List<UserRepresentation> existing = realm.users().searchByEmail(NO_ACCESS, true);
-
-        if (!existing.isEmpty()) {
-            return existing.getFirst();
-        }
-
-        final CredentialRepresentation credential = new CredentialRepresentation();
-        final UserRepresentation user = new UserRepresentation();
-
-        credential.setType(CredentialRepresentation.PASSWORD);
-        if (!StringUtils.hasText(properties.data().sampleUserPassword())) {
-            throw new IllegalStateException("SAMPLE_USER_PASSWORD must be set to import sample data");
-        }
-        credential.setValue(properties.data().sampleUserPassword());
-        credential.setTemporary(false);
-        user.setUsername(NO_ACCESS);
-        user.setEmail(NO_ACCESS);
-        user.setFirstName("No");
-        user.setLastName("Access");
-        user.setEnabled(true);
-        user.setEmailVerified(true);
-        user.setCredentials(List.of(credential));
-
-        try (Response response = realm.users().create(user)) {
-            if (response.getStatus() != Response.Status.CREATED.getStatusCode()) {
-                throw new IllegalStateException("Could not create user " + NO_ACCESS + " in Keycloak: " + response.getStatus());
-            }
-
-            final String path = response.getLocation().getPath();
-
-            return realm.users().get(path.substring(path.lastIndexOf('/') + 1)).toRepresentation();
-        }
     }
 
     /**

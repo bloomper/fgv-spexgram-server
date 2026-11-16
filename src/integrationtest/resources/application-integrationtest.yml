@@ -3,8 +3,6 @@ logging:
     path: ./build/integrationtest-data/log_data
 
 spexgram:
-  data:
-    sample-user-password: s3cr3t-s3cr3t
   web-url: https://spexgram.test
   media:
     base-url: https://media.spexgram.test
