@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class MediaSignerTest {
 
     private static SpexgramProperties properties(final String key) {
-        return new SpexgramProperties(null, null, null, null,
+        return new SpexgramProperties(null, null, null, null, null,
                 new SpexgramProperties.Media("https://media.example.org/", key, Duration.ofHours(4), null, null),
                 null, null, null, null, null);
     }

@@ -164,6 +164,44 @@ public class ItemIntake {
     }
 
     /**
+     * EDITOR (an import, Spexipedia's docs/content-import.md, section 4). Sends a file received through the import API to
+     * Immich as an unpublished item of the album, or finds the item Immich already has it for; returns its id. Immich
+     * recognises a file by its checksum, so importing it again makes no second item.
+     */
+    public java.util.UUID importFile(final Album album, final java.nio.file.Path file, final String fileName, final Viewer viewer) {
+        viewer.requireEditor();
+
+        final Instant now = clock.instant();
+        final ImmichClient.Upload sent = immichClient.upload(file, fileName, now, now);
+        final Item item = Objects.requireNonNull(transactionTemplate.execute(_ -> {
+            final Item found = repository.findByImmichAssetId(sent.id()).orElseGet(Item::new);
+
+            if (found.getId() == null || found.getAlbum() == null) {
+                found.setAlbum(album);
+                found.setImmichAssetId(sent.id());
+                found.setTranscoded(false);
+                found.setOriginalFileName(fileName);
+                found.setStatus(ItemStatus.PROCESSING);
+                found.setProcessingSince(now);
+                found.setUploadedBySubject(viewer.subject());
+                found.setUploadedByName(viewer.caller() == null ? null : viewer.caller().displayName());
+                found.setVisibility(Visibility.UNPUBLISHED);
+                try {
+                    found.setFileSize(java.nio.file.Files.size(file));
+                } catch (final java.io.IOException e) {
+                    throw new java.io.UncheckedIOException(e);
+                }
+                repository.save(found);
+                auditService.record("UPLOAD", "ITEM", found.getUuid(), "Importerade %s till albumet %s".formatted(fileName, album.getTitle()));
+            }
+            return found;
+        }));
+
+        processing.refresh(item.getId());
+        return item.getUuid();
+    }
+
+    /**
      * Replaces an item's file with an upload, e.g. a cropped photo (5.3); the old file is deleted from Immich and the
      * item is processed again.
      */

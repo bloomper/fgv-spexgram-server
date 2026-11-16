@@ -530,6 +530,46 @@ public class AlbumService {
         repository.delete(album);
     }
 
+    /** The optimistic-lock version of an album or an item, or null when it is gone. */
+    @Transactional(readOnly = true)
+    public @Nullable Long recordVersion(final UUID id) {
+        return repository.findByUuid(id).map(Album::getVersion)
+                .or(() -> itemRepository.findByUuid(id).map(Item::getVersion))
+                .orElse(null);
+    }
+
+    /**
+     * EDITOR (an import's forget). Deletes an imported album that nobody has published, with its items and their
+     * files in Immich, or such an item; returns whether it was deleted.
+     */
+    @Transactional
+    public boolean forget(final UUID id) {
+        viewerService.current().requireEditor();
+
+        final Album album = repository.findByUuid(id).orElse(null);
+
+        if (album != null) {
+            if (album.getVisibility() != Visibility.UNPUBLISHED) {
+                return false;
+            }
+            deleteWithItems(album, false);
+            auditService.record("DELETE", "ALBUM", id, "Tog bort det importerade albumet " + album.getTitle());
+            return true;
+        }
+
+        final Item item = itemRepository.findByUuid(id).orElse(null);
+
+        if (item == null || item.getVisibility() != Visibility.UNPUBLISHED) {
+            return false;
+        }
+        immichClient.delete(item.getImmichAssetId() == null ? List.of() : List.of(item.getImmichAssetId()));
+        if (item.getAlbum() != null && item.getId().equals(item.getAlbum().getCoverItemId())) {
+            item.getAlbum().setCoverItemId(null);
+        }
+        itemRepository.delete(item);
+        return true;
+    }
+
     /**
      * Every album in the trash, for emptying it.
      */

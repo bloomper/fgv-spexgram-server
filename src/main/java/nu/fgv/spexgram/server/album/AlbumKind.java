@@ -58,6 +58,14 @@ public class AlbumKind extends AbstractAuditable {
     @Column(name = "name_en", nullable = false)
     private String nameEn;
 
+    /** Other spellings the import recognises, one per line. */
+    @Column(name = "aliases", nullable = false)
+    private String aliases = "";
+
     @Column(name = "position", nullable = false)
     private int position;
+
+    public java.util.List<String> aliasList() {
+        return java.util.Arrays.stream(aliases.split("\\R")).map(String::strip).filter(alias -> !alias.isEmpty()).toList();
+    }
 }

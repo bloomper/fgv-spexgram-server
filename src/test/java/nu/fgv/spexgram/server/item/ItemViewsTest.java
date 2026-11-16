@@ -87,7 +87,7 @@ class ItemViewsTest {
 
     @BeforeEach
     void setUp() {
-        final SpexgramProperties properties = new SpexgramProperties(null, null, null, null,
+        final SpexgramProperties properties = new SpexgramProperties(null, null, null, null, null,
                 new SpexgramProperties.Media("https://media.example.org", "secret", Duration.ofHours(4), null, null),
                 null, null, null, null, null);
 

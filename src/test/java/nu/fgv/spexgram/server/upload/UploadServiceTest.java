@@ -76,7 +76,7 @@ class UploadServiceTest {
 
     @BeforeEach
     void setUp() {
-        final SpexgramProperties properties = new SpexgramProperties(null, null, null, null,
+        final SpexgramProperties properties = new SpexgramProperties(null, null, null, null, null,
                 new SpexgramProperties.Media(null, null, null, folder, DataSize.ofBytes(100)), null, null, null, null, null);
 
         lenient().when(settingsService.current()).thenReturn(new Settings());

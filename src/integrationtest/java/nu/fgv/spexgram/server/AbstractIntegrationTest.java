@@ -393,7 +393,7 @@ public abstract class AbstractIntegrationTest {
     void resetState() throws Exception {
         reportLimiter.clear();
         jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 0").update();
-        for (final String table : List.of("audit_entry", "report", "contribution_review", "album_suggestion", "album_spex", "item",
+        for (final String table : List.of("import_key", "audit_entry", "report", "contribution_review", "album_suggestion", "album_spex", "item",
                 "album", "upload_session", "app_user", "spexipedia_category")) {
             jdbcClient.sql("TRUNCATE TABLE " + table).update();
         }

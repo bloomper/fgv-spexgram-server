@@ -205,6 +205,8 @@ type AlbumKind {
     id: ID!
     nameSv: String!
     nameEn: String!
+    "Other spellings the import recognises."
+    aliases: [String!]!
     position: Int!
     "The first by position: used for new albums."
     isDefault: Boolean!
@@ -215,6 +217,8 @@ type AlbumKind {
 input AlbumKindInput {
     nameSv: String!
     nameEn: String!
+    "Null leaves them as they are."
+    aliases: [String!]
 }
 
 input AlbumFilter {
@@ -670,4 +674,81 @@ type MaintenanceJobStatus {
     lastFinishedAt: Instant
     "Whether the latest run finished without an error; null while it runs."
     lastSucceeded: Boolean
+}
+
+# The import API (spec 5.6.1; Spexipedia's docs/content-import.md, section 4) -------------------------------------------
+# IMPORT only. Files are uploaded first to PUT /api/import/files/{sha256} and referred to by their hash. Albums and items
+# arrive unpublished.
+
+extend type Mutation {
+    "IMPORT. Imports albums and items: new source keys create, known ones update what they made unless an editor has changed it since. With dryRun nothing is kept. At most 500 records."
+    importBatch(input: ImportBatchInput!, dryRun: Boolean! = false): ImportResult!
+    "IMPORT. Removes what was imported under the source prefix and is still unpublished, with its files in Immich; returns how many."
+    importForget(sourcePrefix: String!): Int!
+}
+
+input ImportBatchInput {
+    "Whether album kinds nobody knows become new kinds, instead of failing the record."
+    createMissingKinds: Boolean = false
+    albums: [ImportAlbumInput!]
+    items: [ImportItemInput!]
+}
+
+input ImportFileRefInput {
+    sha256: String!
+    "The file's name, for Immich."
+    name: String
+}
+
+"An album of spex in Spexipedia, of an album kind by name or alias."
+input ImportAlbumInput {
+    sourceKey: String!
+    spexIds: [ID!]
+    kind: String
+    title: String
+    "yyyy-mm-dd"
+    dateFrom: String
+    "yyyy-mm-dd, for a period"
+    dateTo: String
+    place: String
+    description: String
+}
+
+"A photo or short video of an album imported with albumSourceKey, sent to Immich; a file Immich already has makes no second item."
+input ImportItemInput {
+    sourceKey: String!
+    albumSourceKey: String!
+    file: ImportFileRefInput!
+    caption: String
+    photographer: String
+    "When the file's own date is wrong or missing, e.g. a scan."
+    takenAt: String
+}
+
+type ImportResult {
+    dryRun: Boolean!
+    items: [ImportItem!]!
+    created: Int!
+    updated: Int!
+    unchanged: Int!
+    kept: Int!
+    failed: Int!
+}
+
+type ImportItem {
+    kind: String!
+    sourceKey: String!
+    id: ID
+    outcome: ImportOutcome!
+    message: String
+    warnings: [String!]!
+}
+
+enum ImportOutcome {
+    CREATED
+    UPDATED
+    UNCHANGED
+    "An editor changed or removed the record since it was imported, so the import left it alone."
+    KEPT
+    FAILED
 }
