@@ -36,6 +36,10 @@ type Query {
     categories: [Category!]!
     "Anyone. The years of the albums the viewer may see, newest first."
     years: [Int!]!
+    "Anyone. Memories: albums the viewer may see of spex whose premiere was within days (at most 31) of today's date in an earlier year; the nearest premiere first, then the newest spex."
+    premiereAlbums(days: Int = 7, limit: Int = 12): [Album!]!
+    "Anyone. The places of the albums the viewer may see, with how many, most first; spellings that differ only in case are one place."
+    places: [Place!]!
     "Anyone. The spex with albums the viewer may see, newest first, revivals counted with themselves."
     spexWithAlbums: [AlbumSpex!]!
     "Anyone. Albums and items whose titles, places, descriptions, captions or photographers match the words."
@@ -231,6 +235,15 @@ input AlbumFilter {
     kindId: ID
     "EDITOR only."
     visibility: Visibility
+    "The first year of a decade, e.g. 1980: the year of one of the album's spex, or of its date, is in it."
+    decade: Int
+    "The album's place, ignoring case."
+    place: String
+}
+
+type Place {
+    name: String!
+    albumCount: Int!
 }
 
 type AlbumPage {
@@ -296,6 +309,10 @@ type AlbumSpex {
     familyId: ID!
     categoryId: ID
     categoryName: String
+    "yyyy-mm-dd, the first night, from the spex's page in Spexipedia."
+    premiere: String
+    "The poster's thumbnail in Spexipedia (about 320 pixels wide), a public address; a revival without one has its original's."
+    posterUrl: String
     "In spexWithAlbums: the albums of the spex the viewer may see."
     albumCount: Int
 }

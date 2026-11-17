@@ -139,6 +139,8 @@ public class SpexService {
         ref.setRevival(spex.revival());
         ref.setCategoryId(spex.categoryId());
         ref.setCategoryName(spex.categoryName());
+        ref.setPremiere(spex.premiere());
+        ref.setPosterUrl(spex.posterUrl());
         ref.setRefreshedAt(clock.instant());
     }
 

@@ -20,8 +20,11 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
 import org.springframework.graphql.client.HttpSyncGraphQlClient;
 import org.springframework.web.client.RestClient;
+
+import java.time.LocalDate;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
@@ -60,18 +63,19 @@ class SpexipediaClientTest {
     }
 
     @Test
-    void readsOriginalsAndRevivalsWithTheirCategoriesYearsAndPosters() {
+    void readsOriginalsAndRevivalsWithTheirCategoriesYearsPostersAndPremieres() {
         graphql("AllSpex", """
                 {"data": {"spexAll": [
                     {"id": "00000000-0000-7000-8000-000000000001", "year": "1975", "title": "Nobel", "revival": false, "retired": false,
                      "parent": null, "category": {"id": "00000000-0000-7000-8000-000000000003", "name": "Chalmersspexet"},
-                     "poster": {"pageJpegUrl": "https://spexipedia.test/media/images/x/page.jpg"}},
+                     "poster": {"thumbnailUrl": "https://spexipedia.test/media/images/x/thumbnail.webp"}, "page": {"premiere": "1975-02-14"}},
                     {"id": "00000000-0000-7000-8000-000000000002", "year": "okänt", "title": "Nobel", "revival": true, "retired": true,
-                     "parent": {"id": "00000000-0000-7000-8000-000000000001"}, "category": null, "poster": null}]}}""");
+                     "parent": {"id": "00000000-0000-7000-8000-000000000001"}, "category": null, "poster": null, "page": {"premiere": "okänt"}}]}}""");
 
         assertThat(client.allSpex()).containsExactly(
-                new SpexDto(uuid(1), "Nobel", 1975, false, null, uuid(3), "Chalmersspexet", false, "https://spexipedia.test/media/images/x/page.jpg"),
-                new SpexDto(uuid(2), "Nobel", null, true, uuid(1), null, null, true, null));
+                new SpexDto(uuid(1), "Nobel", 1975, false, null, uuid(3), "Chalmersspexet", false,
+                        "https://spexipedia.test/media/images/x/thumbnail.webp", LocalDate.of(1975, 2, 14)),
+                new SpexDto(uuid(2), "Nobel", null, true, uuid(1), null, null, true, null, null));
     }
 
     @Test

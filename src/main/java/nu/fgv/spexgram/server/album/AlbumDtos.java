@@ -53,11 +53,13 @@ public final class AlbumDtos {
      */
     public record AlbumSpexDto(UUID id, @Nullable String title, @Nullable Integer year, @Nullable Boolean revival,
                                @Nullable UUID parentId, UUID familyId, @Nullable UUID categoryId,
-                               @Nullable String categoryName, @Nullable Integer albumCount) {
+                               @Nullable String categoryName, @Nullable String premiere, @Nullable String posterUrl,
+                               @Nullable Integer albumCount) {
 
         static AlbumSpexDto of(final SpexRef ref, final @Nullable Integer albumCount) {
             return new AlbumSpexDto(ref.getId(), ref.getTitle(), ref.getYear(), ref.getRevival(), ref.getParentId(),
-                    ref.familyId(), ref.getCategoryId(), ref.getCategoryName(), albumCount);
+                    ref.familyId(), ref.getCategoryId(), ref.getCategoryName(),
+                    ref.getPremiere() == null ? null : ref.getPremiere().toString(), ref.getPosterUrl(), albumCount);
         }
     }
 
@@ -67,8 +69,24 @@ public final class AlbumDtos {
     public record AlbumPage(List<AlbumDto> albums, long totalCount, int page, int size) {
     }
 
+    /**
+     * @param decade the first year of a decade, e.g. 1980
+     * @param place  an album's place, ignoring case
+     */
     public record AlbumFilter(@Nullable UUID categoryId, @Nullable Integer year, @Nullable UUID spexId,
-                              @Nullable UUID kindId, @Nullable Visibility visibility) {
+                              @Nullable UUID kindId, @Nullable Visibility visibility, @Nullable Integer decade,
+                              @Nullable String place) {
+
+        public AlbumFilter(final @Nullable UUID categoryId, final @Nullable Integer year, final @Nullable UUID spexId,
+                           final @Nullable UUID kindId, final @Nullable Visibility visibility) {
+            this(categoryId, year, spexId, kindId, visibility, null, null);
+        }
+    }
+
+    /**
+     * A place albums were photographed at, with how many of them the viewer may see.
+     */
+    public record PlaceDto(String name, int albumCount) {
     }
 
     public record AlbumInput(@Nullable List<UUID> spexIds, @Nullable String title, @Nullable UUID kindId,
