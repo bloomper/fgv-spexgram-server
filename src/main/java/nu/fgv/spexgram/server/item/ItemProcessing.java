@@ -85,6 +85,7 @@ public class ItemProcessing {
         item.setWidth(asset.width());
         item.setHeight(asset.height());
         item.setDurationMs(asset.durationMs());
+        item.setThumbhash(asset.thumbhash());
         if (asset.fileSize() != null) {
             item.setFileSize(asset.fileSize());
         }

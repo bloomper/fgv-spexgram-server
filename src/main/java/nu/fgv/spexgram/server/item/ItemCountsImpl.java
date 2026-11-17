@@ -20,6 +20,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
@@ -27,14 +28,16 @@ import nu.fgv.spexgram.server.album.Album;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Counts and covers with a {@code GROUP BY}, so that a page of albums costs a fixed number of queries for their item
+ * Counts, covers and the timeline's months with a {@code GROUP BY}, so that a page of albums costs a fixed number of queries for their item
  * counts and covers rather than some per album.
  *
  * @author Anders Jacobsson
@@ -125,6 +128,33 @@ class ItemCountsImpl implements ItemCounts {
             ids.put(row.get(0, Long.class), row.get(1, Long.class));
         }
         return ids;
+    }
+
+    @Override
+    public List<MonthCount> countByMonth(final Specification<Item> specification) {
+        final CriteriaBuilder builder = entityManager.getCriteriaBuilder();
+        final CriteriaQuery<Tuple> query = builder.createTupleQuery();
+        final Root<Item> root = query.from(Item.class);
+        final Predicate matches = specification.toPredicate(root, query, builder);
+        final Path<LocalDateTime> taken = root.get("takenAt");
+        final Expression<Integer> year = builder.function("YEAR", Integer.class, taken);
+        final Expression<Integer> month = builder.function("MONTH", Integer.class, taken);
+
+        query.select(builder.tuple(year, month, builder.count(root))).groupBy(year, month);
+        if (matches != null) {
+            query.where(matches);
+        }
+
+        final List<MonthCount> counts = new ArrayList<>();
+
+        for (final Tuple row : entityManager.createQuery(query).getResultList()) {
+            final Number y = row.get(0, Number.class);
+            final Number m = row.get(1, Number.class);
+
+            counts.add(new MonthCount(y == null || m == null ? null : YearMonth.of(y.intValue(), m.intValue()), row.get(2, Long.class)));
+        }
+        counts.sort(Comparator.comparing(MonthCount::month, Comparator.nullsLast(Comparator.reverseOrder())));
+        return counts;
     }
 
     private static Predicate matching(final Specification<Item> specification, final Root<Item> root, final CriteriaQuery<?> query,

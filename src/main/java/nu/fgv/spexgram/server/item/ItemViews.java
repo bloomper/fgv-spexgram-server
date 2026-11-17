@@ -145,6 +145,7 @@ public class ItemViews {
                 editor ? item.getFileSize() : null,
                 editor ? item.getTrashedAt() : null,
                 Objects.requireNonNull(item.getCreatedAt()),
+                item.getThumbhash(),
                 media(item, context));
     }
 

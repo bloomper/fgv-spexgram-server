@@ -131,6 +131,7 @@ public class ItemIntake {
             item.setAlbum(album);
             item.setImmichAssetId(sent.id());
             item.setTranscoded(false);
+            item.setThumbhash(null);
             item.setOriginalFileName(upload.fileName());
             item.setFileSize(upload.length());
             item.setStatus(ItemStatus.PROCESSING);
@@ -231,6 +232,7 @@ public class ItemIntake {
 
             item.setImmichAssetId(sent.id());
             item.setTranscoded(false);
+            item.setThumbhash(null);
             item.setOriginalFileName(upload.fileName());
             item.setFileSize(upload.length());
             item.setStatus(ItemStatus.PROCESSING);

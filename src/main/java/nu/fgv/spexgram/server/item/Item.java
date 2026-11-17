@@ -142,6 +142,12 @@ public class Item extends AbstractAuditable {
     private boolean transcoded;
 
     /**
+     * Immich's thumbhash, base64: a blurred placeholder for the thumbnail; null until Immich has made the thumbnail.
+     */
+    @Column(name = "thumbhash")
+    private @Nullable String thumbhash;
+
+    /**
      * When Immich got the file, to give up on processing that never finishes.
      */
     @Column(name = "processing_since")

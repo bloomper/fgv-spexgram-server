@@ -22,6 +22,10 @@ type Query {
     recentAlbums(limit: Int = 12): [Album!]!
     "Anyone. An item the viewer may see, else null. A public item is reachable here even in an album for members."
     item(id: ID!): Item
+    "Anyone. The months of the timeline: every item the viewer may see across albums, newest month first, with how many items each has; items without a date last, as month null. With favourites (USER), only the caller's favourites."
+    timeline(favourites: Boolean = false): [TimelineMonth!]!
+    "Anyone. A page of one month's items of the timeline, newest first; month null for the items without a date. At most 500 a page."
+    timelineItems(month: String, favourites: Boolean = false, page: Int = 0, size: Int = 200): ItemPage!
     "Anyone. Items taken on today's date in earlier years, newest first."
     thisDayInHistory(limit: Int = 30): [Item!]!
     "Anyone; SPEXIPEDIA also gets members' items. The albums of a spex and its revivals, oldest first."
@@ -93,6 +97,8 @@ type Mutation {
     itemReplaceFile(id: ID!, uploadId: String!): Item!
     "EDITOR. Replaces the item's caption, photographer, date taken and position."
     itemUpdate(id: ID!, input: ItemInput!): Item!
+    "USER. Marks the items the caller may see as their favourites, or unmarks them; the items, as the caller sees them. Favourites are personal and never change what others see."
+    favouritesSet(itemIds: [ID!]!, favourite: Boolean!): [Item!]!
     "EDITOR. Changes what is given for every item; unsorted items are sorted by giving an album, and an item moved away stops being its old album's cover. Items an open report hides keep their visibility (skipped)."
     itemsUpdate(ids: [ID!]!, input: ItemsInput!): ItemsUpdateResult!
     "EDITOR."
@@ -416,6 +422,10 @@ type Item {
     fileSize: Float
     trashedAt: Instant
     createdAt: Instant!
+    "Whether the caller marked it as a favourite; false for visitors."
+    favourite: Boolean!
+    "Immich's thumbhash (base64): a few bytes that make a blurred placeholder until the thumbnail has loaded; null until Immich has made the thumbnail."
+    thumbhash: String
     "Signed addresses on the media server; null when the file is gone, e.g. a rejected video."
     media: Media
 }
@@ -457,6 +467,8 @@ input ItemsInput {
     visibility: Visibility
     "Moves the items to the album; sorts unsorted items."
     albumId: ID
+    "yyyy-mm-dd: the day each item was taken, keeping its time of day (noon for items without one), e.g. for scans."
+    takenDate: String
 }
 
 enum UploadOutcome {
@@ -581,6 +593,13 @@ type MapItem {
     thumbnailUrl: String
     "When thumbnailUrl stops working; ask again after that."
     expiresAt: Instant
+}
+
+"A month of the timeline."
+type TimelineMonth {
+    "yyyy-mm, or null for the items without a date."
+    month: String
+    count: Int!
 }
 
 type UnsortedDay {

@@ -47,7 +47,8 @@ public final class ItemDtos {
                           @Nullable Integer height, @Nullable Long durationMs, Visibility visibility,
                           Visibility effectiveVisibility, @Nullable ContributionStatus contributionStatus, boolean mine,
                           @Nullable String uploadedBy, @Nullable String originalFileName, @Nullable Long fileSize,
-                          @Nullable Instant trashedAt, Instant createdAt, @Nullable MediaDto media) {
+                          @Nullable Instant trashedAt, Instant createdAt, @Nullable String thumbhash,
+                          @Nullable MediaDto media) {
     }
 
     /**
@@ -70,8 +71,16 @@ public final class ItemDtos {
                             @Nullable Double latitude, @Nullable Double longitude) {
     }
 
+    /**
+     * @param takenDate yyyy-mm-dd: the day each item was taken, keeping its time of day
+     */
     public record ItemsInput(@Nullable String caption, @Nullable String photographer, @Nullable Visibility visibility,
-                             @Nullable UUID albumId) {
+                             @Nullable UUID albumId, @Nullable String takenDate) {
+
+        public ItemsInput(final @Nullable String caption, final @Nullable String photographer,
+                          final @Nullable Visibility visibility, final @Nullable UUID albumId) {
+            this(caption, photographer, visibility, albumId, null);
+        }
     }
 
     public enum UploadOutcome {
@@ -86,6 +95,12 @@ public final class ItemDtos {
     }
 
     public record UnsortedDay(@Nullable String date, List<ItemDto> items) {
+    }
+
+    /**
+     * @param month yyyy-mm, or null for items without a date
+     */
+    public record TimelineMonth(@Nullable String month, int count) {
     }
 
     public record MapItem(UUID id, double latitude, double longitude, @Nullable String takenAt,
