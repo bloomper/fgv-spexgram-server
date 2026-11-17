@@ -435,6 +435,8 @@ type AlbumRef {
     id: ID!
     title: String!
     visibility: Visibility!
+    "The spex the album is about, the main one first."
+    spex: [AlbumSpex!]!
 }
 
 "Addresses on the media server, valid until expiresAt (at least four hours). Ask again when a page has been open longer."

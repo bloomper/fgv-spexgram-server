@@ -17,6 +17,7 @@
 
 package nu.fgv.spexgram.server.album;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -37,6 +38,12 @@ public interface AlbumRepository extends JpaRepository<Album, Long>, JpaSpecific
     Optional<Album> findByUuid(UUID uuid);
 
     List<Album> findByUuidIn(Collection<UUID> uuids);
+
+    /**
+     * The albums with their spex, for use outside a transaction, e.g. as items refer to them in GraphQL.
+     */
+    @EntityGraph(attributePaths = "spex")
+    List<Album> findWithSpexByUuidIn(Collection<UUID> uuids);
 
     List<Album> findByTrashedAtIsNotNullOrderByTrashedAtDesc();
 

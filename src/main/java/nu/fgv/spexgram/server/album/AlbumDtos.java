@@ -63,7 +63,15 @@ public final class AlbumDtos {
         }
     }
 
-    public record AlbumRef(UUID id, String title, Visibility visibility) {
+    /**
+     * An album as an item refers to it, with its spex for the viewer's info panel.
+     */
+    public record AlbumRef(UUID id, String title, Visibility visibility, List<AlbumSpexDto> spex) {
+
+        public static AlbumRef of(final Album album) {
+            return new AlbumRef(album.getUuid(), album.getTitle(), album.getVisibility(),
+                    album.getSpex().stream().map(ref -> AlbumSpexDto.of(ref, null)).toList());
+        }
     }
 
     public record AlbumPage(List<AlbumDto> albums, long totalCount, int page, int size) {

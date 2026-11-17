@@ -42,7 +42,7 @@ class LibraryIntegrationTest extends AbstractIntegrationTest {
     private static final String TIMELINE = "query($f: Boolean) { timeline(favourites: $f) { month count } }";
     private static final String MONTH = """
             query($m: String, $f: Boolean) { timelineItems(month: $m, favourites: $f) {
-                totalCount items { id takenAt thumbhash favourite album { id } }
+                totalCount items { id takenAt thumbhash favourite album { id spex { title } } }
             } }""";
     private static final String FAVOURITE = "mutation($ids: [ID!]!, $on: Boolean!) { favouritesSet(itemIds: $ids, favourite: $on) { id favourite } }";
 
@@ -81,6 +81,7 @@ class LibraryIntegrationTest extends AbstractIntegrationTest {
                 .path("timelineItems.totalCount").entity(Integer.class).isEqualTo(2)
                 .path("timelineItems.items[*].id").entityList(String.class).containsExactly(shows.get(1), shows.get(0))
                 .path("timelineItems.items[0].album.id").entity(String.class).isEqualTo(publicAlbum)
+                .path("timelineItems.items[0].album.spex[0].title").entity(String.class).isEqualTo("Cleopatra")
                 .path("timelineItems.items[0].thumbhash").entity(String.class).satisfies(hash -> assertThat(hash).isNotBlank());
         graphQl(null).document(MONTH).variable("m", "1984-05").execute()
                 .path("timelineItems.totalCount").entity(Integer.class).isEqualTo(0);
