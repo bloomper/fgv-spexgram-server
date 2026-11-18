@@ -36,6 +36,8 @@ import nu.fgv.spexgram.server.immich.ImmichRejectedException;
 import nu.fgv.spexgram.server.item.ContributionStatus;
 import nu.fgv.spexgram.server.item.Item;
 import nu.fgv.spexgram.server.item.ItemProcessing;
+import nu.fgv.spexgram.server.item.Favourite;
+import nu.fgv.spexgram.server.item.FavouriteRepository;
 import nu.fgv.spexgram.server.item.ItemRepository;
 import nu.fgv.spexgram.server.item.ItemStatus;
 import nu.fgv.spexgram.server.report.Report;
@@ -110,9 +112,7 @@ public class SampleDataImporter {
     private static final Duration SPEXIPEDIA_RETRY_INTERVAL = Duration.ofSeconds(10);
     private static final Duration PROCESSING_WAIT = Duration.ofMinutes(5);
     private static final List<String> TABLES = List.of("audit_entry", "report", "contribution_review", "album_suggestion",
-            "album_spex", "item", "album", "album_kind", "upload_session", "app_user");
-    private static final String[][] KINDS = {{"Föreställning", "Show"}, {"Repetition", "Rehearsal"}, {"Fest", "Party"},
-            {"Turné", "Tour"}, {"Jubileum", "Jubilee"}, {"Övrigt", "Other"}};
+            "album_spex", "favourite", "item", "album", "upload_session", "app_user");
     private static final List<String> CAPTIONS = List.of("Kören sjunger öppningsnumret", "Hjältinnan på scenen",
             "Bakom scenen före premiären", "Orkestern stämmer", "Sminkningen är i full gång", "Applåder efter finalen",
             "Fest i kårhusets matsal", "Kulissbygge på lördagen", "Ensemblen på trappan", "Tackkören");
@@ -133,6 +133,7 @@ public class SampleDataImporter {
     private final AlbumRepository albumRepository;
     private final AlbumKindRepository kindRepository;
     private final ItemRepository itemRepository;
+    private final FavouriteRepository favouriteRepository;
     private final AppUserRepository userRepository;
     private final ReportRepository reportRepository;
     private final ContributionReviewRepository reviewRepository;
@@ -147,7 +148,7 @@ public class SampleDataImporter {
                               final ImmichBootstrap immichBootstrap, final ImmichClient immichClient,
                               final ItemProcessing processing, final UploadService uploadService,
                               final SettingsService settingsService, final AlbumRepository albumRepository,
-                              final AlbumKindRepository kindRepository, final ItemRepository itemRepository,
+                              final AlbumKindRepository kindRepository, final ItemRepository itemRepository, final FavouriteRepository favouriteRepository,
                               final AppUserRepository userRepository, final ReportRepository reportRepository,
                               final ContributionReviewRepository reviewRepository,
                               final AlbumSuggestionRepository suggestionRepository,
@@ -166,6 +167,7 @@ public class SampleDataImporter {
         this.albumRepository = albumRepository;
         this.kindRepository = kindRepository;
         this.itemRepository = itemRepository;
+        this.favouriteRepository = favouriteRepository;
         this.userRepository = userRepository;
         this.reportRepository = reportRepository;
         this.reviewRepository = reviewRepository;
@@ -229,6 +231,7 @@ public class SampleDataImporter {
             generator.suggestion(kinds.get(2));
             transactionTemplate.executeWithoutResult(_ -> generator.trashAndReports(albums));
             transactionTemplate.executeWithoutResult(_ -> createAudit(users.get(EDITOR), albums));
+            transactionTemplate.executeWithoutResult(_ -> createFavourites(users.get(USER)));
             if (!large) {
                 awaitProcessing();
             }
@@ -323,22 +326,22 @@ public class SampleDataImporter {
     }
 
     /**
-     * The kinds a new database starts with, as in the migration.
+     * The kinds the migrations seed, with their aliases (show, rehearsal, party and the rest, make-up among them); kinds
+     * an admin added are removed.
      */
     private List<AlbumKind> createKinds() {
-        final List<AlbumKind> kinds = new ArrayList<>();
+        jdbcTemplate.update("DELETE FROM album_kind WHERE created_by <> 'system'");
+        return kindRepository.findAllByOrderByPositionAscIdAsc();
+    }
 
-        for (int i = 0; i < KINDS.length; i++) {
-            final AlbumKind kind = new AlbumKind();
+    /**
+     * The sample user's favourites: a few of the first photos that are not in the trash.
+     */
+    private void createFavourites(final AppUser user) {
+        final List<UUID> ids = java.util.stream.IntStream.range(0, 12).mapToObj(n -> uuid("item", n)).toList();
 
-            kind.setUuid(UUID.fromString("00000000-0000-7000-8000-00000000c00" + (i + 1)));
-            kind.setNameSv(KINDS[i][0]);
-            kind.setNameEn(KINDS[i][1]);
-            kind.setPosition(i + 1);
-            kind.setCreatedBy("system");
-            kinds.add(kindRepository.save(kind));
-        }
-        return kinds;
+        itemRepository.findByUuidIn(ids).stream().filter(item -> !item.isTrashed()).limit(5)
+                .forEach(item -> favouriteRepository.save(new Favourite(user.getId(), item.getId(), clock.instant())));
     }
 
     private void createAudit(final AppUser editor, final List<Album> albums) {

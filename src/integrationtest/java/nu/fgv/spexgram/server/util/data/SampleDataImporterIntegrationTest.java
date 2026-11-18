@@ -78,6 +78,9 @@ class SampleDataImporterIntegrationTest extends AbstractIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM item WHERE contribution_status = 'WAITING'")).isEqualTo(4);
         assertThat(count("SELECT COUNT(*) FROM album WHERE visibility = 'PUBLIC'")).isPositive();
         assertThat(count("SELECT COUNT(*) FROM album WHERE trashed_at IS NOT NULL")).isEqualTo(1);
+        // Every kind the migrations seed has albums (make-up among them), and the sample user has favourites
+        assertThat(count("SELECT COUNT(*) FROM album_kind k WHERE NOT EXISTS (SELECT 1 FROM album a WHERE a.kind_id = k.id)")).isZero();
+        assertThat(count("SELECT COUNT(*) FROM favourite f JOIN app_user u ON u.id = f.user_id WHERE u.username = 'user@fgv.nu'")).isEqualTo(5);
         assertThat(count("SELECT COUNT(*) FROM report WHERE visitor_email IS NOT NULL AND status = 'OPEN'")).isEqualTo(1);
         assertThat(count("SELECT COUNT(*) FROM album_suggestion WHERE status = 'OPEN'")).isEqualTo(1);
 
