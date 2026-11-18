@@ -24,6 +24,7 @@ import nu.fgv.spexgram.server.album.AlbumDtos.AlbumPage;
 import nu.fgv.spexgram.server.album.AlbumDtos.AlbumSpexDto;
 import nu.fgv.spexgram.server.album.AlbumDtos.AlbumVisibilityResult;
 import nu.fgv.spexgram.server.album.AlbumDtos.CategoryDto;
+import nu.fgv.spexgram.server.album.AlbumDtos.PlaceDto;
 import nu.fgv.spexgram.server.album.AlbumDtos.VisibilityCount;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemDto;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemPage;
@@ -92,6 +93,16 @@ public class AlbumGraphqlApi {
     @QueryMapping
     public List<Integer> years() {
         return service.years();
+    }
+
+    @QueryMapping
+    public List<AlbumDto> premiereAlbums(@Argument final @Nullable Integer days, @Argument final @Nullable Integer limit) {
+        return service.premiereAlbums(days == null ? 7 : days, limit == null ? 12 : limit);
+    }
+
+    @QueryMapping
+    public List<PlaceDto> places() {
+        return service.places();
     }
 
     @QueryMapping

@@ -17,6 +17,7 @@
 
 package nu.fgv.spexgram.server.maintenance;
 
+import nu.fgv.spexgram.server.imports.ImportFileStore;
 import lombok.extern.slf4j.Slf4j;
 import nu.fgv.spexgram.server.contribution.ContributionService;
 import nu.fgv.spexgram.server.immich.ImmichUnavailableException;
@@ -56,13 +57,16 @@ public class MaintenanceJobs {
     @SuppressWarnings("java:S107")
     public MaintenanceJobs(final SpexService spexService, final ItemProcessing itemProcessing, final UploadService uploadService,
                            final CallerService callerService, final ReportService reportService,
-                           final ContributionService contributionService) {
+                           final ContributionService contributionService, final ImportFileStore importFiles) {
         this(Map.of(
                 MaintenanceJob.SPEX_REFRESH, spexService::refresh,
                 MaintenanceJob.UNSORTED_SCAN, itemProcessing::scanUnsorted,
                 MaintenanceJob.PROCESSING_POLL, itemProcessing::poll,
                 MaintenanceJob.ITEM_CHECK, itemProcessing::checkExistence,
-                MaintenanceJob.UPLOAD_CLEANUP, uploadService::cleanUp,
+                MaintenanceJob.UPLOAD_CLEANUP, () -> {
+                    uploadService.cleanUp();
+                    importFiles.cleanUp();
+                },
                 MaintenanceJob.RETENTION, () -> {
                     callerService.cleanUp();
                     reportService.cleanUp();

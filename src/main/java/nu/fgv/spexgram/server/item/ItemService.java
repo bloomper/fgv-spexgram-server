@@ -49,6 +49,7 @@ import org.springframework.util.StringUtils;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -134,6 +135,17 @@ public class ItemService {
             return LocalDateTime.parse(value.strip());
         } catch (final DateTimeParseException e) {
             throw new BadRequestException("error.item.taken");
+        }
+    }
+
+    private static @Nullable LocalDate takenDay(final @Nullable String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.strip());
+        } catch (final DateTimeParseException e) {
+            throw new BadRequestException("error.item.takenDate");
         }
     }
 
@@ -431,6 +443,7 @@ public class ItemService {
                 .orElseThrow(() -> new ResourceNotFoundException(Album.class, input.albumId()));
 
         final Set<Long> hidden = input.visibility() == null || items.isEmpty() ? Set.of() : repository.findHiddenByOpenReports(items);
+        final LocalDate day = takenDay(input.takenDate());
 
         for (final Item item : items) {
             if (input.caption() != null) {
@@ -444,6 +457,9 @@ public class ItemService {
             }
             if (album != null) {
                 moveTo(item, album);
+            }
+            if (day != null) {
+                item.setTakenAt(day.atTime(item.getTakenAt() == null ? LocalTime.NOON : item.getTakenAt().toLocalTime()));
             }
         }
 
@@ -461,6 +477,9 @@ public class ItemService {
         }
         if (album != null) {
             changes.add("flyttade dem till albumet " + album.getTitle());
+        }
+        if (day != null) {
+            changes.add("satte datumet till " + day);
         }
         for (final Item item : items) {
             auditService.record(input.visibility() != null ? "VISIBILITY" : "UPDATE", "ITEM", item.getUuid(),

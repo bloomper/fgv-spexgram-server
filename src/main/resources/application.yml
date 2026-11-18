@@ -94,6 +94,10 @@ logging:
 
 spexgram:
   time-zone: Europe/Stockholm
+  imports:
+    # Files received through the import API (Spexipedia's docs/content-import.md, section 4)
+    root: ${API_IMPORTS_ROOT:./data/imports}
+    keep-files: 7d
   web-url: ${API_WEB_URL:http://localhost:3004}
   # The API's public address, whose /api/mcp is the audience MCP tokens must have
   base-url: ${API_BASE_URL:https://api.spexgram.fgv.local.nu:8443}
@@ -120,7 +124,7 @@ spexgram:
     service-client-id: ${API_KEYCLOAK_SERVICE_CLIENT_ID:fgv-spexgram-service}
     service-client-secret: ${API_KEYCLOAK_SERVICE_CLIENT_SECRET:}
   security:
-    authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexgram,fgv-spexipedia-service}
+    authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexgram,fgv-spexipedia-service,fgv-content-migration}
     # Shared with the web, which sends it with the visitor's address (X-Client-IP)
     client-ip-secret: ${API_CLIENT_IP_SECRET:}
   mcp:

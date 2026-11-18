@@ -110,6 +110,16 @@ A member holds at most ten uploads open at a time, each counted against the day'
 
 ``mapItems`` lists items with a position for the map, each with a signed thumbnail address and when it runs out (``expiresAt``).
 
+[[library]]
+== Timeline, favourites and memories
+
+The web's start page is a timeline of every item the viewer may see, across albums: ``timeline`` lists its months, newest first, with how many items each has (items without a date last, as month null), and ``timelineItems`` a page of one month's items, newest first.
+Each item carries Immich's ``thumbhash``, a few bytes the web turns into a blurred placeholder until the thumbnail has loaded.
+Members mark items as favourites with ``favouritesSet``; ``Item.favourite`` says whether the caller has, and ``timeline(favourites: true)`` is the favourites view.
+Favourites are personal, never change what others see, and go with the member's record and with the item.
+``premiereAlbums`` remembers the albums of spex whose premiere was near today's date in an earlier year, and ``places`` lists the albums' places; albums are filtered by ``decade`` and ``place`` too.
+Spex premieres and posters (``AlbumSpex.premiere``, ``posterUrl``) are copied from Spexipedia when an album gets its spex and by ``SPEX_REFRESH`` every night.
+
 [[spexipedia]]
 == Spexipedia and other applications
 

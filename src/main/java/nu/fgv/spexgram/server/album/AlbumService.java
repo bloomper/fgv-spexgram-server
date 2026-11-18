@@ -27,6 +27,7 @@ import nu.fgv.spexgram.server.album.AlbumDtos.AlbumPage;
 import nu.fgv.spexgram.server.album.AlbumDtos.AlbumSpexDto;
 import nu.fgv.spexgram.server.album.AlbumDtos.AlbumVisibilityResult;
 import nu.fgv.spexgram.server.album.AlbumDtos.CategoryDto;
+import nu.fgv.spexgram.server.album.AlbumDtos.PlaceDto;
 import nu.fgv.spexgram.server.audit.AuditService;
 import nu.fgv.spexgram.server.immich.ImmichClient;
 import nu.fgv.spexgram.server.item.ContributionStatus;
@@ -53,6 +54,7 @@ import org.springframework.util.StringUtils;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -76,6 +78,8 @@ import java.util.stream.Collectors;
 public class AlbumService {
 
     static final int MAX_SPEX = 10;
+    /** How far from today's date a premiere may be to be remembered. */
+    static final int MAX_PREMIERE_DAYS = 31;
     /** The largest page of albums for visitors and members; with up to 100 items each, a query stays bounded. */
     static final int MAX_PAGE = 50;
     /** The largest page for editors, whose album pickers list every album. */
@@ -153,7 +157,10 @@ public class AlbumService {
             if (filter.visibility() != null && viewer.isEditor()) {
                 predicates.add(builder.equal(root.get("visibility"), filter.visibility()));
             }
-            if (filter.categoryId() != null || filter.spexId() != null || filter.year() != null) {
+            if (StringUtils.hasText(filter.place())) {
+                predicates.add(builder.equal(builder.lower(root.get("place")), filter.place().strip().toLowerCase(Locale.ROOT)));
+            }
+            if (filter.categoryId() != null || filter.spexId() != null || filter.year() != null || filter.decade() != null) {
                 final Join<Album, SpexRef> spex = root.join("spex", JoinType.LEFT);
 
                 Objects.requireNonNull(query).distinct(true);
@@ -166,6 +173,12 @@ public class AlbumService {
                 if (filter.year() != null) {
                     predicates.add(builder.or(builder.equal(spex.get("year"), filter.year()),
                             builder.between(root.get("dateFrom"), LocalDate.of(filter.year(), 1, 1), LocalDate.of(filter.year(), 12, 31))));
+                }
+                if (filter.decade() != null) {
+                    final int from = Math.floorDiv(filter.decade(), 10) * 10;
+
+                    predicates.add(builder.or(builder.between(spex.get("year"), from, from + 9),
+                            builder.between(root.get("dateFrom"), LocalDate.of(from, 1, 1), LocalDate.of(from + 9, 12, 31))));
                 }
             }
             return builder.and(predicates.toArray(Predicate[]::new));
@@ -320,6 +333,70 @@ public class AlbumService {
                 .sorted(Comparator.comparing((SpexRef ref) -> ref.getYear() == null ? 0 : ref.getYear()).reversed()
                         .thenComparing(ref -> Objects.requireNonNullElse(ref.getTitle(), "")))
                 .map(ref -> AlbumSpexDto.of(ref, counts.get(ref.getId())))
+                .toList();
+    }
+
+    /**
+     * The places of the albums the viewer may see, with how many, most first; spellings that differ only in case are
+     * one place, named as most of its albums name it.
+     */
+    @Transactional(readOnly = true)
+    public List<PlaceDto> places() {
+        final Map<String, Map<String, Integer>> spellings = new LinkedHashMap<>();
+
+        for (final Album album : visibleAlbums()) {
+            if (StringUtils.hasText(album.getPlace())) {
+                final String place = album.getPlace().strip();
+
+                spellings.computeIfAbsent(place.toLowerCase(Locale.ROOT), _ -> new LinkedHashMap<>()).merge(place, 1, Integer::sum);
+            }
+        }
+        return spellings.values().stream()
+                .map(names -> new PlaceDto(names.entrySet().stream().max(Map.Entry.comparingByValue()).orElseThrow().getKey(),
+                        names.values().stream().mapToInt(Integer::intValue).sum()))
+                .sorted(Comparator.comparing(PlaceDto::albumCount).reversed().thenComparing(PlaceDto::name, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    /**
+     * How many days the premiere's date in some year is from the day, ignoring the year; a premiere on 29 February is
+     * on 28 February in other years.
+     */
+    static int daysFromPremiere(final LocalDate premiere, final LocalDate day) {
+        int nearest = Integer.MAX_VALUE;
+
+        for (int year = day.getYear() - 1; year <= day.getYear() + 1; year++) {
+            nearest = Math.min(nearest, (int) Math.abs(ChronoUnit.DAYS.between(day, premiere.withYear(year))));
+        }
+        return nearest;
+    }
+
+    /**
+     * Albums the viewer may see of spex whose premiere was within the days of today's date in an earlier year, as
+     * memories: nearest premiere first, then the newest spex, each spex's albums oldest first.
+     */
+    @Transactional(readOnly = true)
+    public List<AlbumDto> premiereAlbums(final int days, final int limit) {
+        final Viewer viewer = viewerService.current();
+        final LocalDate today = LocalDate.now(clock);
+        final int window = Math.clamp(days, 0, MAX_PREMIERE_DAYS);
+        final record Memory(Album album, int distance, LocalDate premiere) {
+        }
+
+        return visibleAlbums(viewer).stream()
+                .flatMap(album -> album.getSpex().stream()
+                        .map(SpexRef::getPremiere)
+                        .filter(Objects::nonNull)
+                        .filter(premiere -> premiere.getYear() < today.getYear() && daysFromPremiere(premiere, today) <= window)
+                        .map(premiere -> new Memory(album, daysFromPremiere(premiere, today), premiere))
+                        .min(Comparator.comparingInt(Memory::distance))
+                        .stream())
+                .sorted(Comparator.comparingInt(Memory::distance)
+                        .thenComparing(Memory::premiere, Comparator.reverseOrder())
+                        .thenComparing(memory -> memory.album().getDateFrom() == null ? LocalDate.MAX : memory.album().getDateFrom())
+                        .thenComparing(memory -> memory.album().getId()))
+                .limit(Math.clamp(limit, 1, maxPage(viewer)))
+                .map(memory -> toDto(memory.album()))
                 .toList();
     }
 
@@ -528,6 +605,46 @@ public class AlbumService {
         }
         album.setCoverItemId(null);
         repository.delete(album);
+    }
+
+    /** The optimistic-lock version of an album or an item, or null when it is gone. */
+    @Transactional(readOnly = true)
+    public @Nullable Long recordVersion(final UUID id) {
+        return repository.findByUuid(id).map(Album::getVersion)
+                .or(() -> itemRepository.findByUuid(id).map(Item::getVersion))
+                .orElse(null);
+    }
+
+    /**
+     * EDITOR (an import's forget). Deletes an imported album that nobody has published, with its items and their
+     * files in Immich, or such an item; returns whether it was deleted.
+     */
+    @Transactional
+    public boolean forget(final UUID id) {
+        viewerService.current().requireEditor();
+
+        final Album album = repository.findByUuid(id).orElse(null);
+
+        if (album != null) {
+            if (album.getVisibility() != Visibility.UNPUBLISHED) {
+                return false;
+            }
+            deleteWithItems(album, false);
+            auditService.record("DELETE", "ALBUM", id, "Tog bort det importerade albumet " + album.getTitle());
+            return true;
+        }
+
+        final Item item = itemRepository.findByUuid(id).orElse(null);
+
+        if (item == null || item.getVisibility() != Visibility.UNPUBLISHED) {
+            return false;
+        }
+        immichClient.delete(item.getImmichAssetId() == null ? List.of() : List.of(item.getImmichAssetId()));
+        if (item.getAlbum() != null && item.getId().equals(item.getAlbum().getCoverItemId())) {
+            item.getAlbum().setCoverItemId(null);
+        }
+        itemRepository.delete(item);
+        return true;
     }
 
     /**

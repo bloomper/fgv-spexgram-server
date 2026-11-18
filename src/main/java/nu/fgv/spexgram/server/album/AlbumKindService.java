@@ -70,7 +70,7 @@ public class AlbumKindService {
     }
 
     static AlbumKindDto toDto(final AlbumKind kind) {
-        return new AlbumKindDto(kind.getUuid(), kind.getNameSv(), kind.getNameEn(), kind.getPosition());
+        return new AlbumKindDto(kind.getUuid(), kind.getNameSv(), kind.getNameEn(), kind.aliasList(), kind.getPosition());
     }
 
     private static String name(final @Nullable String value) {
@@ -137,6 +137,7 @@ public class AlbumKindService {
 
         kind.setNameSv(name(input.nameSv()));
         kind.setNameEn(name(input.nameEn()));
+        kind.setAliases(aliases(input.aliases()));
         kind.setPosition(repository.findAllByOrderByPositionAscIdAsc().stream().mapToInt(AlbumKind::getPosition).max().orElse(0) + 1);
         repository.save(kind);
         auditService.record("CREATE", "ALBUM_KIND", kind.getUuid(), "Skapade albumsorten " + kind.getNameSv());
@@ -151,6 +152,9 @@ public class AlbumKindService {
 
         kind.setNameSv(name(input.nameSv()));
         kind.setNameEn(name(input.nameEn()));
+        if (input.aliases() != null) {
+            kind.setAliases(aliases(input.aliases()));
+        }
         auditService.record("UPDATE", "ALBUM_KIND", kind.getUuid(), "Ändrade albumsorten " + kind.getNameSv());
         return toDto(kind);
     }
@@ -195,9 +199,60 @@ public class AlbumKindService {
         return repository.findByUuid(id).orElseThrow(() -> new ResourceNotFoundException("error.albumKind.notFound", id));
     }
 
-    public record AlbumKindDto(UUID id, String nameSv, String nameEn, int position) {
+    private static String aliases(final @Nullable List<String> aliases) {
+        final String joined = aliases == null ? "" : aliases.stream().filter(org.springframework.util.StringUtils::hasText)
+                .map(String::strip).distinct().collect(java.util.stream.Collectors.joining("\n"));
+
+        if (joined.length() > 2000) {
+            throw new BadRequestException("error.albumKind.name");
+        }
+        return joined;
     }
 
-    public record AlbumKindInput(@Nullable String nameSv, @Nullable String nameEn) {
+    /**
+     * The kind whose Swedish or English name or one of whose aliases is the text, ignoring case and punctuation; for the
+     * import (Spexipedia's docs/content-import.md, section 3).
+     */
+    @Transactional(readOnly = true)
+    public java.util.Optional<AlbumKind> match(final @Nullable String text) {
+        final String wanted = normalize(text);
+
+        if (wanted.isEmpty()) {
+            return java.util.Optional.empty();
+        }
+        return repository.findAllByOrderByPositionAscIdAsc().stream().filter(kind -> normalize(kind.getNameSv()).equals(wanted)
+                || normalize(kind.getNameEn()).equals(wanted) || kind.aliasList().stream().anyMatch(alias -> normalize(alias).equals(wanted)))
+                .findFirst();
+    }
+
+    static String normalize(final @Nullable String text) {
+        return text == null ? "" : text.strip().toLowerCase(java.util.Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+", " ").strip();
+    }
+
+    /**
+     * IMPORT. A new kind with the name in both languages.
+     */
+    @Transactional
+    public AlbumKind createForImport(final String name) {
+        callerService.current().requireImport();
+
+        final AlbumKind kind = new AlbumKind();
+
+        kind.setNameSv(name(name));
+        kind.setNameEn(kind.getNameSv());
+        kind.setPosition(repository.findAllByOrderByPositionAscIdAsc().stream().mapToInt(AlbumKind::getPosition).max().orElse(0) + 1);
+        repository.save(kind);
+        auditService.record("CREATE", "ALBUM_KIND", kind.getUuid(), "Skapade albumsorten " + kind.getNameSv() + " vid import");
+        return kind;
+    }
+
+    public record AlbumKindDto(UUID id, String nameSv, String nameEn, List<String> aliases, int position) {
+    }
+
+    public record AlbumKindInput(@Nullable String nameSv, @Nullable String nameEn, @Nullable List<String> aliases) {
+
+        public AlbumKindInput(final @Nullable String nameSv, final @Nullable String nameEn) {
+            this(nameSv, nameEn, null);
+        }
     }
 }

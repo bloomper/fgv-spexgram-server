@@ -41,7 +41,7 @@ import java.util.function.Supplier;
 public class SpexipediaClient {
 
     static final int PAGE_SIZE = 500;
-    private static final String SPEX_FIELDS = "id year title revival retired parent { id } category { id name } poster { pageJpegUrl }";
+    private static final String SPEX_FIELDS = "id year title revival retired parent { id } category { id name } poster { thumbnailUrl } page { premiere }";
     private static final String ALL_SPEX = """
             query AllSpex {
                 spexAll(includeRetired: true) { %s }
@@ -129,19 +129,23 @@ public class SpexipediaClient {
     record CategoryNode(String id, @Nullable String name) {
     }
 
-    record PosterNode(@Nullable String pageJpegUrl) {
+    record PosterNode(@Nullable String thumbnailUrl) {
+    }
+
+    record PageNode(@Nullable String premiere) {
     }
 
     record SpexNode(String id, @Nullable String year, @Nullable String title, @Nullable Boolean revival,
                     @Nullable Boolean retired, @Nullable IdRef parent, @Nullable CategoryNode category,
-                    @Nullable PosterNode poster) {
+                    @Nullable PosterNode poster, @Nullable PageNode page) {
 
         SpexDto toDto() {
             return new SpexDto(UUID.fromString(id), title, SpexDto.year(year), Boolean.TRUE.equals(revival),
                     parent == null ? null : UUID.fromString(parent.id()),
                     category == null ? null : UUID.fromString(category.id()),
                     category == null ? null : category.name(),
-                    Boolean.TRUE.equals(retired), poster == null ? null : poster.pageJpegUrl());
+                    Boolean.TRUE.equals(retired), poster == null ? null : poster.thumbnailUrl(),
+                    page == null ? null : SpexDto.day(page.premiere()));
         }
     }
 

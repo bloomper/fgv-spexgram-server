@@ -36,6 +36,16 @@ public record Caller(String subject, String username, @Nullable String displayNa
         roles = Set.copyOf(roles);
     }
 
+    public boolean isImport() {
+        return roles.contains(Role.IMPORT);
+    }
+
+    public void requireImport() {
+        if (!isImport()) {
+            throw new org.springframework.security.access.AccessDeniedException("IMPORT required");
+        }
+    }
+
     public boolean isUser() {
         return roles.contains(Role.USER);
     }

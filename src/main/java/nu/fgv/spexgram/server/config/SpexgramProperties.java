@@ -34,6 +34,7 @@ import java.util.List;
  */
 @ConfigurationProperties(prefix = "spexgram")
 public record SpexgramProperties(String timeZone,
+                                 Imports imports,
                                  String webUrl,
                                  Keycloak keycloak,
                                  Security security,
@@ -102,5 +103,12 @@ public record SpexgramProperties(String timeZone,
     }
 
     public record Data(boolean importSampleData, String sampleDataSize) {
+    }
+
+    /**
+     * @param root      files received through the import API, {@code files/<sha256>}
+     * @param keepFiles how long a received file is kept when no batch uses it
+     */
+    public record Imports(java.nio.file.Path root, java.time.Duration keepFiles) {
     }
 }

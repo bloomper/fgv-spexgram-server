@@ -32,5 +32,10 @@ public enum Role {
     /**
      * Spexipedia's service account: telling Spexgram that its change feed has something new.
      */
-    NOTIFY
+    NOTIFY,
+    /**
+     * The import API (Spexipedia's docs/content-import.md, section 4): fgv-content-migration's and Spexipedia's service
+     * accounts. It acts as an editor only while an import runs.
+     */
+    IMPORT
 }

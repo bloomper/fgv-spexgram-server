@@ -22,6 +22,10 @@ type Query {
     recentAlbums(limit: Int = 12): [Album!]!
     "Anyone. An item the viewer may see, else null. A public item is reachable here even in an album for members."
     item(id: ID!): Item
+    "Anyone. The months of the timeline: every item the viewer may see across albums, newest month first, with how many items each has; items without a date last, as month null. With favourites (USER), only the caller's favourites."
+    timeline(favourites: Boolean = false): [TimelineMonth!]!
+    "Anyone. A page of one month's items of the timeline, newest first; month null for the items without a date. At most 500 a page."
+    timelineItems(month: String, favourites: Boolean = false, page: Int = 0, size: Int = 200): ItemPage!
     "Anyone. Items taken on today's date in earlier years, newest first."
     thisDayInHistory(limit: Int = 30): [Item!]!
     "Anyone; SPEXIPEDIA also gets members' items. The albums of a spex and its revivals, oldest first."
@@ -36,6 +40,10 @@ type Query {
     categories: [Category!]!
     "Anyone. The years of the albums the viewer may see, newest first."
     years: [Int!]!
+    "Anyone. Memories: albums the viewer may see of spex whose premiere was within days (at most 31) of today's date in an earlier year; the nearest premiere first, then the newest spex."
+    premiereAlbums(days: Int = 7, limit: Int = 12): [Album!]!
+    "Anyone. The places of the albums the viewer may see, with how many, most first; spellings that differ only in case are one place."
+    places: [Place!]!
     "Anyone. The spex with albums the viewer may see, newest first, revivals counted with themselves."
     spexWithAlbums: [AlbumSpex!]!
     "Anyone. Albums and items whose titles, places, descriptions, captions or photographers match the words."
@@ -89,6 +97,8 @@ type Mutation {
     itemReplaceFile(id: ID!, uploadId: String!): Item!
     "EDITOR. Replaces the item's caption, photographer, date taken and position."
     itemUpdate(id: ID!, input: ItemInput!): Item!
+    "USER. Marks the items the caller may see as their favourites, or unmarks them; the items, as the caller sees them. Favourites are personal and never change what others see."
+    favouritesSet(itemIds: [ID!]!, favourite: Boolean!): [Item!]!
     "EDITOR. Changes what is given for every item; unsorted items are sorted by giving an album, and an item moved away stops being its old album's cover. Items an open report hides keep their visibility (skipped)."
     itemsUpdate(ids: [ID!]!, input: ItemsInput!): ItemsUpdateResult!
     "EDITOR."
@@ -205,6 +215,8 @@ type AlbumKind {
     id: ID!
     nameSv: String!
     nameEn: String!
+    "Other spellings the import recognises."
+    aliases: [String!]!
     position: Int!
     "The first by position: used for new albums."
     isDefault: Boolean!
@@ -215,6 +227,8 @@ type AlbumKind {
 input AlbumKindInput {
     nameSv: String!
     nameEn: String!
+    "Null leaves them as they are."
+    aliases: [String!]
 }
 
 input AlbumFilter {
@@ -227,6 +241,15 @@ input AlbumFilter {
     kindId: ID
     "EDITOR only."
     visibility: Visibility
+    "The first year of a decade, e.g. 1980: the year of one of the album's spex, or of its date, is in it."
+    decade: Int
+    "The album's place, ignoring case."
+    place: String
+}
+
+type Place {
+    name: String!
+    albumCount: Int!
 }
 
 type AlbumPage {
@@ -292,6 +315,10 @@ type AlbumSpex {
     familyId: ID!
     categoryId: ID
     categoryName: String
+    "yyyy-mm-dd, the first night, from the spex's page in Spexipedia."
+    premiere: String
+    "The poster's thumbnail in Spexipedia (about 320 pixels wide), a public address; a revival without one has its original's."
+    posterUrl: String
     "In spexWithAlbums: the albums of the spex the viewer may see."
     albumCount: Int
 }
@@ -395,6 +422,10 @@ type Item {
     fileSize: Float
     trashedAt: Instant
     createdAt: Instant!
+    "Whether the caller marked it as a favourite; false for visitors."
+    favourite: Boolean!
+    "Immich's thumbhash (base64): a few bytes that make a blurred placeholder until the thumbnail has loaded; null until Immich has made the thumbnail."
+    thumbhash: String
     "Signed addresses on the media server; null when the file is gone, e.g. a rejected video."
     media: Media
 }
@@ -404,6 +435,8 @@ type AlbumRef {
     id: ID!
     title: String!
     visibility: Visibility!
+    "The spex the album is about, the main one first."
+    spex: [AlbumSpex!]!
 }
 
 "Addresses on the media server, valid until expiresAt (at least four hours). Ask again when a page has been open longer."
@@ -436,6 +469,8 @@ input ItemsInput {
     visibility: Visibility
     "Moves the items to the album; sorts unsorted items."
     albumId: ID
+    "yyyy-mm-dd: the day each item was taken, keeping its time of day (noon for items without one), e.g. for scans."
+    takenDate: String
 }
 
 enum UploadOutcome {
@@ -562,6 +597,13 @@ type MapItem {
     expiresAt: Instant
 }
 
+"A month of the timeline."
+type TimelineMonth {
+    "yyyy-mm, or null for the items without a date."
+    month: String
+    count: Int!
+}
+
 type UnsortedDay {
     "yyyy-mm-dd, or null for items without a date taken."
     date: String
@@ -670,4 +712,81 @@ type MaintenanceJobStatus {
     lastFinishedAt: Instant
     "Whether the latest run finished without an error; null while it runs."
     lastSucceeded: Boolean
+}
+
+# The import API (spec 5.6.1; Spexipedia's docs/content-import.md, section 4) -------------------------------------------
+# IMPORT only. Files are uploaded first to PUT /api/import/files/{sha256} and referred to by their hash. Albums and items
+# arrive unpublished.
+
+extend type Mutation {
+    "IMPORT. Imports albums and items: new source keys create, known ones update what they made unless an editor has changed it since. With dryRun nothing is kept. At most 500 records."
+    importBatch(input: ImportBatchInput!, dryRun: Boolean! = false): ImportResult!
+    "IMPORT. Removes what was imported under the source prefix and is still unpublished, with its files in Immich; returns how many."
+    importForget(sourcePrefix: String!): Int!
+}
+
+input ImportBatchInput {
+    "Whether album kinds nobody knows become new kinds, instead of failing the record."
+    createMissingKinds: Boolean = false
+    albums: [ImportAlbumInput!]
+    items: [ImportItemInput!]
+}
+
+input ImportFileRefInput {
+    sha256: String!
+    "The file's name, for Immich."
+    name: String
+}
+
+"An album of spex in Spexipedia, of an album kind by name or alias."
+input ImportAlbumInput {
+    sourceKey: String!
+    spexIds: [ID!]
+    kind: String
+    title: String
+    "yyyy-mm-dd"
+    dateFrom: String
+    "yyyy-mm-dd, for a period"
+    dateTo: String
+    place: String
+    description: String
+}
+
+"A photo or short video of an album imported with albumSourceKey, sent to Immich; a file Immich already has makes no second item."
+input ImportItemInput {
+    sourceKey: String!
+    albumSourceKey: String!
+    file: ImportFileRefInput!
+    caption: String
+    photographer: String
+    "When the file's own date is wrong or missing, e.g. a scan."
+    takenAt: String
+}
+
+type ImportResult {
+    dryRun: Boolean!
+    items: [ImportItem!]!
+    created: Int!
+    updated: Int!
+    unchanged: Int!
+    kept: Int!
+    failed: Int!
+}
+
+type ImportItem {
+    kind: String!
+    sourceKey: String!
+    id: ID
+    outcome: ImportOutcome!
+    message: String
+    warnings: [String!]!
+}
+
+enum ImportOutcome {
+    CREATED
+    UPDATED
+    UNCHANGED
+    "An editor changed or removed the record since it was imported, so the import left it alone."
+    KEPT
+    FAILED
 }

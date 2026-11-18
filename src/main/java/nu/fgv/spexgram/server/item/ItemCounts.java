@@ -17,13 +17,16 @@
 package nu.fgv.spexgram.server.item;
 
 import nu.fgv.spexgram.server.album.Album;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.YearMonth;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
- * Counting items per album in one query, for {@link ItemRepository}.
+ * Counting items per album or month in one query, for {@link ItemRepository}.
  *
  * @author Anders Jacobsson
  * @since 1.0
@@ -40,4 +43,16 @@ public interface ItemCounts {
      * last, then by id), by the album's id; albums without any are left out. Two queries for any number of albums.
      */
     Map<Long, Long> firstByAlbum(Specification<Item> specification, Collection<Album> albums);
+
+    /**
+     * How many items match the specification in each month they were taken, newest month first; items without a
+     * date are counted under null, last.
+     */
+    List<MonthCount> countByMonth(Specification<Item> specification);
+
+    /**
+     * @param month the month, or null for items without a date
+     */
+    record MonthCount(@Nullable YearMonth month, long count) {
+    }
 }

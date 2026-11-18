@@ -112,7 +112,23 @@ public class CallerService {
     public Optional<Caller> currentIfAny() {
         return SecurityUtil.currentJwt().map(jwt -> fromJwt(jwt, SecurityUtil.currentAuthentication()
                 .map(authentication -> authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList())
-                .orElse(List.of())));
+                .orElse(List.of())))
+                .map(CallerService::elevated);
+    }
+
+    /**
+     * While an import runs ({@link ImportScope}), its service account writes as an editor does, through the same
+     * services and their rules. Outside an import it has no such rights.
+     */
+    private static Caller elevated(final Caller caller) {
+        if (!caller.isImport() || !ImportScope.active()) {
+            return caller;
+        }
+
+        final java.util.Set<Role> roles = java.util.EnumSet.copyOf(caller.roles());
+
+        roles.addAll(java.util.List.of(Role.USER, Role.EDITOR));
+        return new Caller(caller.subject(), caller.username(), caller.displayName(), caller.email(), roles);
     }
 
     /**

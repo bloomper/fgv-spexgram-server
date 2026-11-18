@@ -24,6 +24,7 @@ import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -58,6 +59,18 @@ public class SpexRef {
 
     @Column(name = "category_name")
     private @Nullable String categoryName;
+
+    /**
+     * The first night, from the spex's page in Spexipedia; null when the page has none.
+     */
+    @Column(name = "premiere")
+    private @Nullable LocalDate premiere;
+
+    /**
+     * The poster's thumbnail in Spexipedia, a public address; a revival without one has its original's.
+     */
+    @Column(name = "poster_url")
+    private @Nullable String posterUrl;
 
     @Column(name = "refreshed_at")
     private @Nullable Instant refreshedAt;

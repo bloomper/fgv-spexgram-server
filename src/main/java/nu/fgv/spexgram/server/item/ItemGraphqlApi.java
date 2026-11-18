@@ -103,7 +103,7 @@ public class ItemGraphqlApi {
 
         // One query for every album of the page of items, not one per album
         if (!ids.isEmpty()) {
-            albumRepository.findByUuidIn(ids).forEach(album -> albums.put(album.getUuid(), new AlbumRef(album.getUuid(), album.getTitle(), album.getVisibility())));
+            albumRepository.findWithSpexByUuidIn(ids).forEach(album -> albums.put(album.getUuid(), AlbumRef.of(album)));
         }
         items.forEach(item -> result.put(item, item.albumId() == null ? null : albums.get(item.albumId())));
         return result;

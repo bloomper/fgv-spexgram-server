@@ -46,7 +46,7 @@ class GraphqlConfigTest {
     private static final InetSocketAddress CALLER = new InetSocketAddress("198.51.100.9", 443);
 
     private static @Nullable Object clientIp(final @Nullable String secret, final Map<String, String> headers) {
-        final SpexgramProperties properties = new SpexgramProperties(null, null, null,
+        final SpexgramProperties properties = new SpexgramProperties(null, null, null, null,
                 new SpexgramProperties.Security(List.of(), secret), null, null, null, null, null, null);
         final WebGraphQlInterceptor interceptor = new GraphqlConfig().clientIpInterceptor(properties);
         final HttpHeaders httpHeaders = new HttpHeaders();

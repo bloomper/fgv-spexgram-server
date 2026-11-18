@@ -22,6 +22,8 @@ import nu.fgv.spexgram.server.album.AlbumRepository;
 import nu.fgv.spexgram.server.album.AlbumService;
 import nu.fgv.spexgram.server.audit.AuditService;
 import nu.fgv.spexgram.server.immich.ImmichClient;
+import nu.fgv.spexgram.server.item.ItemDtos.ItemsInput;
+import nu.fgv.spexgram.server.util.error.BadRequestException;
 import nu.fgv.spexgram.server.visibility.Viewer;
 import nu.fgv.spexgram.server.visibility.ViewerService;
 import nu.fgv.spexgram.server.visibility.Visibility;
@@ -36,6 +38,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,6 +46,7 @@ import java.util.Set;
 
 import static nu.fgv.spexgram.server.util.TestUuids.uuid;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -176,5 +180,30 @@ class ItemServiceTest {
 
         assertThat(item.getAlbum()).isSameAs(other);
         assertThat(old.getCoverItemId()).isNull();
+    }
+
+    @Test
+    void anEditorSetsTheDayOfManyItemsKeepingTheirTimeOfDay() {
+        final Album album = album(1);
+        final Item dated = item(7, album);
+        final Item undated = item(8, album);
+
+        dated.setTakenAt(LocalDateTime.of(2001, 1, 1, 21, 30));
+        when(viewerService.current()).thenReturn(new Viewer(Viewer.Kind.EDITOR, TestCallers.editor()));
+        when(repository.findByUuidIn(List.of(dated.getUuid(), undated.getUuid()))).thenReturn(List.of(dated, undated));
+
+        service.updateAll(List.of(dated.getUuid(), undated.getUuid()), new ItemsInput(null, null, null, null, "1984-02-14"));
+
+        assertThat(dated.getTakenAt()).isEqualTo(LocalDateTime.of(1984, 2, 14, 21, 30));
+        assertThat(undated.getTakenAt()).isEqualTo(LocalDateTime.of(1984, 2, 14, 12, 0));
+        verify(auditService).record(eq("UPDATE"), eq("ITEM"), eq(dated.getUuid()), ArgumentMatchers.contains("satte datumet till 1984-02-14"));
+    }
+
+    @Test
+    void aDayThatIsNotOneIsRefused() {
+        when(viewerService.current()).thenReturn(new Viewer(Viewer.Kind.EDITOR, TestCallers.editor()));
+
+        assertThatThrownBy(() -> service.updateAll(List.of(), new ItemsInput(null, null, null, null, "14/2")))
+                .isInstanceOf(BadRequestException.class);
     }
 }
