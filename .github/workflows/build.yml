@@ -68,20 +68,33 @@ jobs:
       # Lint, unit and integration tests on pull requests and pushes alike.
       # Only this repository is checked out: the realm is the committed copy in src/integrationtest/resources.
       # The sample data and the integration tests make videos with ffmpeg; Immich runs in Testcontainers
-      # apt on the runners sometimes hangs on a slow mirror: each try is cut short and retried, and the step gives up in
-      # minutes instead of holding the build until the job's six-hour limit
+      # The runners' Ubuntu mirror is sometimes very slow (a few kB/s), so ffmpeg's packages are kept in the Actions cache
+      # and downloaded only when it has none for this runner image; bump the key's version if the cached ones stop fitting
+      - name: Cache ffmpeg packages
+        uses: actions/cache@v6
+        with:
+          path: ~/ffmpeg-debs
+          key: ${{ runner.os }}-${{ env.ImageOS }}-ffmpeg-debs-v1
       - name: Install ffmpeg
-        timeout-minutes: 10
+        timeout-minutes: 25
         run: |
+          debs="$HOME/ffmpeg-debs"
+          if compgen -G "$debs/*.deb" > /dev/null && sudo dpkg -i "$debs"/*.deb; then
+            ffmpeg -version | head -1
+            exit 0
+          fi
+          echo "No usable cached packages: downloading"
+          apt=(sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=60)
           for attempt in 1 2 3; do
-            if timeout 120 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update \
-                && timeout 240 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y ffmpeg; then
-              exit 0
-            fi
-            echo "Installing ffmpeg failed (attempt $attempt); trying again"
-            sleep 10
+            timeout 180 "${apt[@]}" update && break
+            echo "apt-get update failed (attempt $attempt)"
           done
-          exit 1
+          rm -rf "$debs" && mkdir -p "$debs/partial"
+          "${apt[@]}" -o Dir::Cache::archives="$debs" install -y --download-only ffmpeg
+          sudo rm -rf "$debs/partial" "$debs/lock"
+          sudo chmod -R a+rX "$debs"
+          sudo dpkg -i "$debs"/*.deb
+          ffmpeg -version | head -1
       - name: Build and test
         run: ./gradlew check
       - name: Publish test results
