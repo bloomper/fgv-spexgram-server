@@ -183,7 +183,7 @@ The import generates the files, never real photos: images with the album's title
 HEIC is left out: ffmpeg, the only encoder in the image, cannot write it.
 They go through Immich's real upload and processing; with ``small`` the import waits until Immich has processed them.
 
-The archive has albums of every kind and visibility, with and without spex, captions and photographers with Swedish characters, a public item in an album for members, unpublished and trashed albums and items, contributions waiting for review and one accepted, a member's album suggestion, an open report, a handled one and a visitor's report, and unsorted items from two evenings.
+The archive has albums of every kind the migrations seed (make-up among them, with the aliases the content migration uses) and visibility, with and without spex, captions and photographers with Swedish characters, a public item in an album for members, unpublished and trashed albums and items, contributions waiting for review and one accepted, a member's album suggestion, an open report, a handled one and a visitor's report, and unsorted items from two evenings; ``user@fgv.nu`` has marked five photos as favourites.
 
 [[keycloak]]
 == Keycloak
