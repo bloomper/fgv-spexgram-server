@@ -68,8 +68,20 @@ jobs:
       # Lint, unit and integration tests on pull requests and pushes alike.
       # Only this repository is checked out: the realm is the committed copy in src/integrationtest/resources.
       # The sample data and the integration tests make videos with ffmpeg; Immich runs in Testcontainers
+      # apt on the runners sometimes hangs on a slow mirror: each try is cut short and retried, and the step gives up in
+      # minutes instead of holding the build until the job's six-hour limit
       - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        timeout-minutes: 10
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 120 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update \
+                && timeout 240 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y ffmpeg; then
+              exit 0
+            fi
+            echo "Installing ffmpeg failed (attempt $attempt); trying again"
+            sleep 10
+          done
+          exit 1
       - name: Build and test
         run: ./gradlew check
       - name: Publish test results
