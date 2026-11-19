@@ -27,7 +27,7 @@ import org.springframework.context.annotation.Configuration;
 import java.time.Duration;
 
 /**
- * Caches for what other services answer: the spex in Spexregister.
+ * Caches for what other services answer: the spex in Spexipedia.
  *
  * @author Anders Jacobsson
  * @since 1.0
