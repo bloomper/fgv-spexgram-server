@@ -84,6 +84,11 @@ jobs:
             exit 0
           fi
           echo "No usable cached packages: downloading"
+          # The runners' own mirror (e.g. us-east-2.ec2.archive.ubuntu.com) has crawled at a few kB/s while Azure's
+          # gave 15 MB/s: download from Azure's, with Ubuntu's as the fallback
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            printf '%s\n' http://azure.archive.ubuntu.com/ubuntu/ http://archive.ubuntu.com/ubuntu/ | sudo tee /etc/apt/apt-mirrors.txt
+          fi
           apt=(sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=60)
           for attempt in 1 2 3; do
             timeout 180 "${apt[@]}" update && break
