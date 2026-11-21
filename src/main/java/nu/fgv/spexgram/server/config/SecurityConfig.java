@@ -33,6 +33,7 @@ import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtAudienceValidator;
+import org.springframework.security.oauth2.jwt.JwtClaimNames;
 import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
@@ -80,7 +81,9 @@ public class SecurityConfig {
                     JwtValidators.createDefaultWithIssuer(issuerUri),
                     new JwtAudienceValidator(resource),
                     new JwtClaimValidator<String>("azp", authorizedParties::contains),
-                    accessTokenTypeValidator()
+                    accessTokenTypeValidator(),
+                    new JwtClaimValidator<String>(JwtClaimNames.SUB, StringUtils::hasText),
+                    new JwtClaimValidator<String>("email", StringUtils::hasText)
             ));
             return decoder;
         });
