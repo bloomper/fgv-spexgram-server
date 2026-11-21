@@ -53,6 +53,8 @@ public class SpexipediaSync {
 
     private static final int MAX_ERROR = 1000;
     private static final int MAX_PAGES = 1000;
+    static final int MAX_ATTEMPTS = 5;
+    private static final int MAX_SKIPPED = 50;
 
     private final SpexipediaClient client;
     private final SpexgramProperties properties;
@@ -116,11 +118,7 @@ public class SpexipediaSync {
                 final FeedChange.Page page = client.changes(cursor);
                 final String next = page.cursor() == null ? cursor : page.cursor();
 
-                transactionTemplate.executeWithoutResult(_ -> {
-                    page.changes().forEach(this::apply);
-                    jdbc.sql("UPDATE spexipedia_sync SET cursor_value = :cursor, applied = applied + :n WHERE id = 1")
-                            .param("cursor", next).param("n", page.changes().size()).update();
-                });
+                applyPage(page, next);
                 applied += page.changes().size();
                 cursor = next;
                 if (!page.hasMore()) {
@@ -141,6 +139,79 @@ public class SpexipediaSync {
             cacheManager.getCacheNames().forEach(name -> Objects.requireNonNull(cacheManager.getCache(name)).clear());
         }
         return Optional.of(applied);
+    }
+
+    /**
+     * Applies a page in one transaction with the cursor. When that fails its changes are applied one at a time, so that
+     * the ones before the failing one are kept. A change that keeps failing is tried {@value #MAX_ATTEMPTS} times, at
+     * as many pulls; then it is recorded as skipped, for admins to see, and the feed goes on without it.
+     */
+    void applyPage(final FeedChange.Page page, final @Nullable String next) {
+        try {
+            transactionTemplate.executeWithoutResult(_ -> {
+                page.changes().forEach(this::apply);
+                moveCursor(next, page.changes().size());
+            });
+            return;
+        } catch (final RuntimeException e) {
+            log.warn("A page of {} changes from Spexipedia could not be applied, applying them one at a time: {}",
+                    page.changes().size(), message(e));
+        }
+        for (final FeedChange change : page.changes()) {
+            try {
+                transactionTemplate.executeWithoutResult(_ -> {
+                    apply(change);
+                    moveCursor(change.sequence(), 1);
+                });
+            } catch (final RuntimeException e) {
+                if (attempt(change) < MAX_ATTEMPTS) {
+                    throw e;
+                }
+                skip(change, message(e));
+            }
+        }
+        transactionTemplate.executeWithoutResult(_ -> moveCursor(next, 0));
+    }
+
+    /**
+     * Moves the cursor; whatever was failing before it no longer is.
+     */
+    private void moveCursor(final @Nullable String cursor, final int applied) {
+        jdbc.sql("""
+                        UPDATE spexipedia_sync SET cursor_value = :cursor, applied = applied + :n, failing_sequence = NULL, failing_attempts = 0
+                        WHERE id = 1""")
+                .param("cursor", cursor).param("n", applied).update();
+    }
+
+    /**
+     * Counts one more failed attempt at the change and answers how many there have been.
+     */
+    private int attempt(final FeedChange change) {
+        jdbc.sql("""
+                        UPDATE spexipedia_sync
+                        SET failing_attempts = CASE WHEN failing_sequence = :sequence THEN failing_attempts + 1 ELSE 1 END,
+                            failing_sequence = :sequence
+                        WHERE id = 1""")
+                .param("sequence", change.sequence()).update();
+        return jdbc.sql("SELECT failing_attempts FROM spexipedia_sync WHERE id = 1").query(Integer.class).single();
+    }
+
+    private void skip(final FeedChange change, final String error) {
+        log.error("Skipped change {} from Spexipedia ({} {} {}) after {} attempts: {}", change.sequence(), change.change(),
+                change.kind(), change.id(), MAX_ATTEMPTS, error);
+        transactionTemplate.executeWithoutResult(_ -> {
+            jdbc.sql("""
+                            INSERT INTO spexipedia_sync_skipped (sequence, kind, record_id, change_type, error, skipped_at)
+                            VALUES (:sequence, :kind, :id, :change, :error, :at)""")
+                    .param("sequence", change.sequence()).param("kind", change.kind()).param("id", change.id().toString())
+                    .param("change", change.change()).param("error", error.substring(0, Math.min(error.length(), MAX_ERROR)))
+                    .param("at", now()).update();
+            moveCursor(change.sequence(), 0);
+        });
+    }
+
+    private static String message(final RuntimeException e) {
+        return Objects.requireNonNullElse(e.getMessage(), e.getClass().getSimpleName());
     }
 
     private Instant now() {
@@ -238,15 +309,32 @@ public class SpexipediaSync {
     }
 
     public Status status() {
+        final List<Skipped> skipped = jdbc.sql("""
+                        SELECT sequence, kind, record_id, change_type, error, skipped_at FROM spexipedia_sync_skipped
+                        ORDER BY id DESC LIMIT :max""")
+                .param("max", MAX_SKIPPED)
+                .query((rs, _) -> new Skipped(rs.getString("sequence"), rs.getString("kind"), rs.getString("record_id"),
+                        rs.getString("change_type"), rs.getString("error"), rs.getTimestamp("skipped_at").toInstant()))
+                .list();
+
         return jdbc.sql("SELECT cursor_value, last_pulled_at, last_success, last_error, applied FROM spexipedia_sync WHERE id = 1")
                 .query((rs, _) -> new Status(rs.getString("cursor_value"),
                         rs.getTimestamp("last_pulled_at") == null ? null : rs.getTimestamp("last_pulled_at").toInstant(),
                         rs.getTimestamp("last_success") == null ? null : rs.getTimestamp("last_success").toInstant(),
-                        rs.getString("last_error"), rs.getLong("applied")))
+                        rs.getString("last_error"), rs.getLong("applied"), skipped))
                 .single();
     }
 
+    /**
+     * Where the copy has got to in the feed, and the latest changes that were skipped.
+     */
     public record Status(@Nullable String cursor, @Nullable Instant lastPulledAt, @Nullable Instant lastSuccess,
-                         @Nullable String lastError, long applied) {
+                         @Nullable String lastError, long applied, List<Skipped> skipped) {
+    }
+
+    /**
+     * A change that could not be applied and was left out: the copy lacks it until it is made again in Spexipedia.
+     */
+    public record Skipped(String sequence, String kind, String id, String change, String error, Instant skippedAt) {
     }
 }

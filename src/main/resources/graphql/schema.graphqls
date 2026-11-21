@@ -74,6 +74,8 @@ type Query {
     immichStatus: ImmichStatus!
     "ADMIN. The scheduled maintenance jobs, with their schedules and how their latest runs went."
     maintenanceJobs: [MaintenanceJobStatus!]!
+    "ADMIN. How the copy of Spexipedia's base data follows its change feed, and the latest changes that were skipped."
+    spexipediaSync: SpexipediaSyncStatus!
 }
 
 type Mutation {
@@ -789,4 +791,33 @@ enum ImportOutcome {
     "An editor changed or removed the record since it was imported, so the import left it alone."
     KEPT
     FAILED
+}
+
+"How the copy of Spexipedia's base data follows its change feed."
+type SpexipediaSyncStatus {
+    "When the feed was last asked, or null when it never was."
+    lastPulledAt: Instant
+    "When every change asked for was last applied."
+    lastSuccess: Instant
+    "Why the latest pull failed; null when it did not."
+    lastError: String
+    "The latest changes that could not be applied and were left out, newest first, at most 50."
+    skipped: [SpexipediaSyncSkipped!]!
+}
+
+"""
+A change from Spexipedia that failed five pulls in a row and was left out, so that the changes after it are not held up.
+The copy lacks it until the record is changed again in Spexipedia.
+"""
+type SpexipediaSyncSkipped {
+    "Its place in the feed."
+    sequence: String!
+    "SPEX_CATEGORY, SPEX, TASK_CATEGORY, TASK, CHARACTER or NUMBER."
+    kind: String!
+    "The record's id in Spexipedia."
+    id: ID!
+    "UPSERT, RETIRE or MERGE."
+    change: String!
+    error: String!
+    skippedAt: Instant!
 }
