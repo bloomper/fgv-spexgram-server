@@ -83,7 +83,10 @@ management:
 
 server:
   port: 8080
-  forward-headers-strategy: framework
+  request:
+    header:
+      forwarded:
+        strategy: framework
   tomcat:
     # tus chunks are at most 50 MB
     max-swallow-size: 60MB
