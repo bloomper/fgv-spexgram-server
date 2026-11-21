@@ -74,7 +74,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/ffmpeg-debs
-          key: ${{ runner.os }}-${{ env.ImageOS }}-ffmpeg-debs-v1
+          key: ${{ runner.os }}-${{ env.ImageOS }}-${{ env.ImageVersion }}-ffmpeg-debs-v2
       - name: Install ffmpeg
         timeout-minutes: 25
         run: |
@@ -84,6 +84,10 @@ jobs:
             exit 0
           fi
           echo "No usable cached packages: downloading"
+          # Packages of another release that dpkg half installed would break apt: take them out again
+          if compgen -G "$debs/*.deb" > /dev/null; then
+            for deb in "$debs"/*.deb; do dpkg-deb -f "$deb" Package; done | sort -u | xargs sudo dpkg --purge --force-depends || true
+          fi
           apt=(sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=60)
           for attempt in 1 2 3; do
             timeout 180 "${apt[@]}" update && break
