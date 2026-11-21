@@ -74,7 +74,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/ffmpeg-debs
-          key: ${{ runner.os }}-${{ env.ImageOS }}-ffmpeg-debs-v1
+          key: ${{ runner.os }}-${{ env.ImageOS }}-${{ env.ImageVersion }}-ffmpeg-debs-v2
       - name: Install ffmpeg
         timeout-minutes: 25
         run: |
@@ -84,6 +84,10 @@ jobs:
             exit 0
           fi
           echo "No usable cached packages: downloading"
+          # Packages of another release that dpkg half installed would break apt: take them out again
+          if compgen -G "$debs/*.deb" > /dev/null; then
+            for deb in "$debs"/*.deb; do dpkg-deb -f "$deb" Package; done | sort -u | xargs sudo dpkg --purge --force-depends || true
+          fi
           # The runners' own mirror (e.g. us-east-2.ec2.archive.ubuntu.com) has crawled at a few kB/s while Azure's
           # gave 15 MB/s: download from Azure's, with Ubuntu's as the fallback
           if [ -f /etc/apt/apt-mirrors.txt ]; then
