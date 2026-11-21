@@ -42,6 +42,7 @@ import org.springframework.security.oauth2.server.resource.authentication.Delega
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.util.StringUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
@@ -64,12 +65,16 @@ public class SecurityConfig {
     public SecurityFilterChain mcpSecurityFilterChain(final HttpSecurity http,
                                                       @Value("${spring.ai.mcp.server.streamable-http.mcp-endpoint}") final String mcpEndpoint,
                                                       @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") final String issuerUri,
+                                                      @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}") final String jwkSetUri,
                                                       @Value("${spexgram.mcp.authorized-parties}") final List<String> authorizedParties,
                                                       @Value("${spexgram.base-url}") final String baseUrl,
                                                       final JwtAuthenticationConverter jwtAuthenticationConverter) {
         final String resource = UriComponentsBuilder.fromUriString(baseUrl).replacePath(mcpEndpoint).build().toUriString();
         final JwtDecoder jwtDecoder = new SupplierJwtDecoder(() -> {
-            final NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
+            // In a container Keycloak's keys are read inside the network, as for the rest of the API
+            final NimbusJwtDecoder decoder = StringUtils.hasText(jwkSetUri)
+                    ? NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build()
+                    : NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
 
             decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                     JwtValidators.createDefaultWithIssuer(issuerUri),
