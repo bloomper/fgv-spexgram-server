@@ -76,5 +76,22 @@ class SpexipediaIntegrationTest extends AbstractIntegrationTest {
 
         sync.applyAll(List.of(new FeedChange("3", "SPEX", spex, "MERGE", other, null, null)));
         assertThat(jdbcClient.sql("SELECT spex_id FROM album_spex").query(String.class).single()).isEqualTo(other.toString());
+
+        // An album about both spex names the surviving one once, and the positions close up
+        final UUID third = UUID.fromString("00000000-0000-7000-8000-000000000006");
+        final UUID duplicate = UUID.fromString("00000000-0000-7000-8000-000000000007");
+
+        jdbcClient.sql("""
+                        INSERT INTO album_spex (album_id, position, spex_id, title)
+                        SELECT album_id, position + 1, :duplicate, 'Dubblett' FROM album_spex WHERE spex_id = :other""")
+                .param("duplicate", duplicate.toString()).param("other", other.toString()).update();
+        jdbcClient.sql("""
+                        INSERT INTO album_spex (album_id, position, spex_id, title)
+                        SELECT album_id, position + 2, :third, 'Tredje' FROM album_spex WHERE spex_id = :other""")
+                .param("third", third.toString()).param("other", other.toString()).update();
+        sync.applyAll(List.of(new FeedChange("9", "SPEX", duplicate, "MERGE", other, null, null)));
+        assertThat(jdbcClient.sql("SELECT spex_id FROM album_spex ORDER BY position").query(String.class).list())
+                .containsExactly(other.toString(), third.toString());
+        assertThat(jdbcClient.sql("SELECT MAX(position) - MIN(position) FROM album_spex").query(Integer.class).single()).isEqualTo(1);
     }
 }
