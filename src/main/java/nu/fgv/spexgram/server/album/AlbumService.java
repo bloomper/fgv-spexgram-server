@@ -451,7 +451,7 @@ public class AlbumService {
         final Map<UUID, SpexRef> current = album.getSpex().stream().collect(Collectors.toMap(SpexRef::getId, ref -> ref, (a, _) -> a));
 
         for (final UUID spexId : spexIds) {
-            // Spex the album already has keep their copies; only new ones are read from Spexregister
+            // Spex the album already has keep their copies; only new ones are read from Spexipedia
             final SpexRef ref = current.containsKey(spexId) ? current.get(spexId) : copyOf(spexService.byId(spexId));
 
             refs.add(ref);

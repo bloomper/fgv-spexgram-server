@@ -46,7 +46,7 @@ import java.util.UUID;
 
 /**
  * Something that was photographed: a show, a rehearsal, a party, a tour or a jubilee. It may be about spex in
- * Spexregister, the main one first. New albums start unpublished.
+ * Spexipedia, the main one first. New albums start unpublished.
  *
  * @author Anders Jacobsson
  * @since 1.0
