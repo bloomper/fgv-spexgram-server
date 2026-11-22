@@ -23,8 +23,6 @@ import nu.fgv.spexgram.server.user.ImportScope;
 import nu.fgv.spexgram.server.util.error.BadRequestException;
 import nu.fgv.spexgram.server.util.error.ResourceNotFoundException;
 import org.jspecify.annotations.Nullable;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -65,18 +63,16 @@ public class ImportEngine {
     private final CallerService callerService;
     private final TransactionTemplate transactionTemplate;
     private final EntityManager entityManager;
-    private final MessageSource messages;
     private final JsonMapper json;
     private final Clock clock;
 
     public ImportEngine(final ImportKeyRepository keys, final CallerService callerService,
                         final PlatformTransactionManager transactionManager, final EntityManager entityManager,
-                        final MessageSource messages, final JsonMapper json, final Clock clock) {
+                        final JsonMapper json, final Clock clock) {
         this.keys = keys;
         this.callerService = callerService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.entityManager = entityManager;
-        this.messages = messages;
         this.json = json;
         this.clock = clock;
     }
@@ -116,7 +112,7 @@ public class ImportEngine {
 
         private final boolean dryRun;
         private final boolean createMissingKinds;
-        private final List<String> warnings = new ArrayList<>();
+        private final List<ImportText> warnings = new ArrayList<>();
         private final java.util.Set<String> planned = new java.util.HashSet<>();
 
         public Batch(final boolean dryRun, final boolean createMissingKinds) {
@@ -132,8 +128,9 @@ public class ImportEngine {
             return createMissingKinds;
         }
 
-        public void warn(final String warning) {
-            warnings.add(warning);
+        /** A warning about the record being imported: a message code and its arguments. */
+        public void warn(final String code, final Object... args) {
+            warnings.add(ImportText.of(code, args));
         }
 
         /**
@@ -144,8 +141,8 @@ public class ImportEngine {
             return sourceKey != null && planned.contains(sourceKey.strip());
         }
 
-        List<String> drainWarnings() {
-            final List<String> drained = List.copyOf(warnings);
+        List<ImportText> drainWarnings() {
+            final List<ImportText> drained = List.copyOf(warnings);
 
             warnings.clear();
             return drained;
@@ -161,8 +158,9 @@ public class ImportEngine {
         FAILED
     }
 
-    public record ItemResult(String kind, String sourceKey, @Nullable UUID id, Outcome outcome, @Nullable String message,
-                             List<String> warnings) {
+    /** One record's outcome; its message and warnings are put in a language when read (ImportGraphqlApi). */
+    public record ItemResult(String kind, String sourceKey, @Nullable UUID id, Outcome outcome, @Nullable ImportText message,
+                             List<ImportText> warnings) {
     }
 
     /**
@@ -310,12 +308,11 @@ public class ImportEngine {
         return removed;
     }
 
-    private String message(final RuntimeException e) {
+    private static ImportText message(final RuntimeException e) {
         if (e instanceof org.springframework.web.server.ResponseStatusException status && status.getDetailMessageCode() != null) {
-            return messages.getMessage(status.getDetailMessageCode(), status.getDetailMessageArguments(),
-                    status.getDetailMessageCode(), LocaleContextHolder.getLocale());
+            return ImportText.of(status.getDetailMessageCode(), status.getDetailMessageArguments());
         }
-        return e.getClass().getSimpleName() + (e.getMessage() == null ? "" : ": " + e.getMessage());
+        return ImportText.of("import.failed.unexpected", e.getClass().getSimpleName() + (e.getMessage() == null ? "" : ": " + e.getMessage()));
     }
 
     public static String sha256(final String text) {
