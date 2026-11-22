@@ -128,11 +128,11 @@ $ docker compose up -d                 # add --profile ml for search by content,
 ----
 
 This starts MySQL, Immich (server, PostgreSQL and Valkey; machine learning with the profile ``ml``), the media server and ``spexgram-api``, which reaches Keycloak, Spexipedia and Mailpit by their container names on the ``fgv-local`` network and Immich on the project's own network.
-At start the API sets Immich up: it creates Immich's admin, configures it and creates its three API keys in ``./data/immich-keys`` and, for the media server, ``./data/immich-media-key`` (see <<immich>>).
+At start the API sets Immich up: it creates Immich's admin, configures it and creates its three API keys in ``immich-keys`` and, for the media server, ``immich-media-key`` in its folder (see <<local_folders>> and <<immich>>).
 Caddy serves the API on ``https://api.spexgram.fgv.local.nu:8443`` and the media server on ``https://media.spexgram.fgv.local.nu:8443``.
 MySQL, Immich and the media server are also published on localhost, on ports 3310, 2283 and 8086.
 
-When the ``spexgram-api`` container isn't running, Caddy forwards ``https://api.spexgram.fgv.local.nu:8443`` to port 8085 on the host, i.e. Spexgram Server started from the IDE or with ``./gradlew bootRun`` with the Spring profile ``local``, which reaches Immich on ``localhost:2283``, keeps its keys in ``./data/immich-keys`` and signs media addresses for ``http://localhost:8086``:
+When the ``spexgram-api`` container isn't running, Caddy forwards ``https://api.spexgram.fgv.local.nu:8443`` to port 8085 on the host, i.e. Spexgram Server started from the IDE or with ``./gradlew bootRun`` with the Spring profile ``local``, which reaches Immich on ``localhost:2283``, keeps its keys in ``./data/immich-keys`` (set ``API_DATA=./data`` in ``.env`` so that ``spexgram-media`` finds its key) and signs media addresses for ``http://localhost:8086``:
 
 [source,bash]
 ----
@@ -140,7 +140,7 @@ $ docker compose up -d spexgram-mysql immich-server
 $ MYSQL_API_USER_PASSWORD=<FGV_SPEXGRAM_MYSQL_USER_PASSWORD> \
   API_KEYCLOAK_SERVICE_CLIENT_SECRET=<…> API_MEDIA_SIGNING_KEY=<…> \
   API_IMMICH_ADMIN_PASSWORD=<…> ./gradlew bootRun --args='--spring.profiles.active=local'
-$ docker compose up -d spexgram-media   # once the API has created data/immich-media-key/media.key
+$ docker compose up -d spexgram-media   # once the API has created immich-media-key/media.key
 ----
 
 The JVM must then trust Caddy's local root certificate (see <<caddy>>), since it reaches Keycloak at ``https://auth.fgv.local.nu:8443``.
@@ -151,6 +151,18 @@ The realm lets a locally running https://github.com/bloomper/fgv-spexgram-web[fg
 It finds fgv-infra-deploy in ``../../fgv-infra-deploy``, or where ``INFRA_DEPLOY`` points.
 
 The same setup for staging and production is in https://github.com/bloomper/fgv-spexgram-deploy[fgv-spexgram-deploy] and fgv-infra-deploy.
+
+[[local_folders]]
+=== Local folders
+
+Docker Compose keeps everything on the host, under ``.docker``, one folder per service:
+
+* ``.docker/mysql``: the database and its error log
+* ``.docker/api``: the API's logs, unfinished uploads, imports and Immich keys
+* ``.docker/immich``: Immich's originals and thumbnails (``data``), database (``postgres``) and models (``model_cache``)
+* ``.docker/secrets``: the secrets, see <<configuration>>
+
+An API started from the IDE or with ``./gradlew bootRun`` keeps its files in ``./data`` instead. ``spexgram-media`` reads the API's ``immich-media-key``. To let the containers see the files of an API started from the IDE, set ``API_DATA=./data`` in ``.env``.
 
 [[immich]]
 == Immich
