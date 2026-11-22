@@ -88,4 +88,16 @@ class ImportIntegrationTest extends AbstractIntegrationTest {
                 .path("importForget").entity(Integer.class).isEqualTo(2);
         assertThat(jdbcClient.sql("SELECT COUNT(*) FROM album").query(Integer.class).single()).isZero();
     }
+
+    @Test
+    void aRecordsMessageIsInTheLanguageAskedFor() {
+        graphQlWithToken(serviceToken(MIGRATION)).document("""
+                        mutation($input: ImportBatchInput!) { importBatch(input: $input, dryRun: true) {
+                            items { outcome sv: message(locale: "sv") en: message(locale: "en") }
+                        } }""")
+                .variable("input", Map.of("albums", List.of(Map.of("sourceKey", " ", "spexIds", List.of(SPEX_ID), "kind", "rephelg", "title", "Rephelg 3")))).execute()
+                .path("importBatch.items[0].outcome").entity(String.class).isEqualTo("FAILED")
+                .path("importBatch.items[0].sv").entity(String.class).isEqualTo("Fältet sourceKey är tomt, för långt eller ogiltigt.")
+                .path("importBatch.items[0].en").entity(String.class).isEqualTo("The field sourceKey is empty, too long or invalid.");
+    }
 }

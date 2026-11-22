@@ -20,6 +20,7 @@ package nu.fgv.spexgram.server.report;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import nu.fgv.spexgram.server.audit.AuditService;
+import nu.fgv.spexgram.server.util.StoredText;
 import nu.fgv.spexgram.server.item.Item;
 import nu.fgv.spexgram.server.item.ItemRepository;
 import nu.fgv.spexgram.server.item.ItemViews;
@@ -183,8 +184,8 @@ public class ReportService {
                 report.setHiddenFrom(hide(item, visitor));
             }
             repository.save(report);
-            auditService.record("REPORT", "ITEM", item.getUuid(), "%s anmälde %s%s".formatted(visitor ? "En besökare" : "En medlem",
-                    caption(item), report.getHiddenFrom() != null ? ", som doldes" : ""));
+            auditService.record("REPORT", "ITEM", item.getUuid(),
+                    StoredText.of("audit.item.report." + (visitor ? "visitor" : "member") + (report.getHiddenFrom() != null ? "Hidden" : ""), caption(item)));
             return toDto(report, false);
         }));
 
@@ -247,12 +248,7 @@ public class ReportService {
                 } else if (report.getHiddenFrom() != null) {
                     showAgain(report, item);
                 }
-                auditService.record("REPORT", "ITEM", item.getUuid(), "Hanterade en anmälan av %s: %s".formatted(caption(item),
-                        switch (outcome) {
-                            case REMOVED -> "lade den i papperskorgen";
-                            case CORRECTED -> "rättade den";
-                            case KEPT -> "behöll den";
-                        }));
+                auditService.record("REPORT", "ITEM", item.getUuid(), StoredText.of("audit.item.reportHandled." + outcome.name(), caption(item)));
             }
             return report;
         }));

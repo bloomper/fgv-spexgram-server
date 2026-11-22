@@ -18,6 +18,7 @@
 package nu.fgv.spexgram.server.settings;
 
 import nu.fgv.spexgram.server.audit.AuditService;
+import nu.fgv.spexgram.server.util.StoredText;
 import nu.fgv.spexgram.server.user.Caller;
 import nu.fgv.spexgram.server.user.CallerService;
 import nu.fgv.spexgram.server.util.Locales;
@@ -128,7 +129,7 @@ public class SettingsService {
         settings.setLastModifiedBy(caller.subject());
         settings.setLastModifiedAt(clock.instant());
         repository.save(settings);
-        auditService.record("UPDATE", "SETTINGS", null, "Ändrade inställningarna");
+        auditService.record("UPDATE", "SETTINGS", null, StoredText.of("audit.settings.update"));
         return toDto(settings);
     }
 

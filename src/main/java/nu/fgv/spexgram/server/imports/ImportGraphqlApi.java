@@ -18,12 +18,16 @@ package nu.fgv.spexgram.server.imports;
 
 import nu.fgv.spexgram.server.imports.ImportEngine.ItemResult;
 import nu.fgv.spexgram.server.imports.ImportEngine.Outcome;
+import org.jspecify.annotations.Nullable;
+import org.springframework.context.MessageSource;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
+import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
 
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -36,9 +40,11 @@ import java.util.Map;
 public class ImportGraphqlApi {
 
     private final SpexgramImport service;
+    private final MessageSource messages;
 
-    public ImportGraphqlApi(final SpexgramImport service) {
+    public ImportGraphqlApi(final SpexgramImport service, final MessageSource messages) {
         this.service = service;
+        this.messages = messages;
     }
 
     @MutationMapping
@@ -49,6 +55,24 @@ public class ImportGraphqlApi {
     @MutationMapping
     public int importForget(@Argument final String sourcePrefix) {
         return service.forget(sourcePrefix);
+    }
+
+    /** The record's message in the language asked for, else the request's. */
+    @SchemaMapping(typeName = "ImportItem", field = "message")
+    public @Nullable String message(final ItemResult item, @Argument final @Nullable String locale, final Locale requested) {
+        return item.message() == null ? null : item.message().in(messages, locale(locale, requested));
+    }
+
+    /** The record's warnings in the language asked for, else the request's. */
+    @SchemaMapping(typeName = "ImportItem", field = "warnings")
+    public List<String> warnings(final ItemResult item, @Argument final @Nullable String locale, final Locale requested) {
+        final Locale in = locale(locale, requested);
+
+        return item.warnings().stream().map(warning -> warning.in(messages, in)).toList();
+    }
+
+    private static Locale locale(final @Nullable String asked, final Locale requested) {
+        return asked == null || asked.isBlank() ? requested : Locale.forLanguageTag(asked.strip());
     }
 
     public record ImportResult(boolean dryRun, List<ItemResult> items, int created, int updated, int unchanged, int kept,

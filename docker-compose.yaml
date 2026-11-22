@@ -14,11 +14,11 @@ services:
     command: --log-error=/var/log/mysql/error.log
     environment:
       MYSQL_HOST: localhost
-      MYSQL_DATABASE: ${FGV_SPEXGRAM_MYSQL_DATABASE}
-      MYSQL_ROOT_USER: ${FGV_SPEXGRAM_MYSQL_ROOT_USER}
-      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD
-      MYSQL_USER: ${FGV_SPEXGRAM_MYSQL_USER}
-      MYSQL_PASSWORD_FILE: /run/secrets/FGV_SPEXGRAM_MYSQL_USER_PASSWORD
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_ROOT_USER: ${MYSQL_ROOT_USER}
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/MYSQL_ROOT_PASSWORD
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD_FILE: /run/secrets/MYSQL_USER_PASSWORD
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent" ]
       interval: 10s
@@ -28,14 +28,14 @@ services:
     ports:
       - "127.0.0.1:3310:3306"
     volumes:
-      - fgv_spexgram_mysql_data:/var/lib/mysql
-      - fgv_spexgram_mysql_log:/var/log/mysql
+      - ./.docker/mysql/data:/var/lib/mysql
+      - ./.docker/mysql/log:/var/log/mysql
     secrets:
-      - FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD
-      - FGV_SPEXGRAM_MYSQL_USER_PASSWORD
+      - MYSQL_ROOT_PASSWORD
+      - MYSQL_USER_PASSWORD
 
-  # Signed media addresses, passed on to Immich with the read-only key the API leaves in ./data/immich-media-key; it
-  # mounts only that folder, never the API's own key in ./data/immich-keys
+  # Signed media addresses, passed on to Immich with the read-only key the API leaves in immich-media-key; it
+  # mounts only that folder, never the API's own key in immich-keys
   spexgram-media:
     image: 'nginx:1.30-alpine'
     restart: unless-stopped
@@ -64,7 +64,7 @@ services:
       - "127.0.0.1:8086:80"
     volumes:
       - ${SPEXGRAM_DEPLOY:-../fgv-spexgram-deploy}/media/default.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - ./data/immich-media-key:/run/immich-keys:ro
+      - ${API_DATA:-./.docker/api}/immich-media-key:/run/immich-keys:ro
     networks:
       - default
       - fgv
@@ -76,8 +76,8 @@ services:
     #platform: linux/arm64
     environment:
       SPRING_PROFILES_ACTIVE: local
-      SPRING_DATASOURCE_URL: jdbc:mysql://spexgram-mysql/${FGV_SPEXGRAM_MYSQL_DATABASE}
-      SPRING_DATASOURCE_USERNAME: ${FGV_SPEXGRAM_MYSQL_USER}
+      SPRING_DATASOURCE_URL: jdbc:mysql://spexgram-mysql/${MYSQL_DATABASE}
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
       SERVER_PORT: 8080
       MANAGEMENT_SERVER_PORT: 9000
       LOGGING_FILE_PATH: /data/log_data
@@ -87,6 +87,7 @@ services:
       API_WEB_URL: ${SPEXGRAM_WEB_ORIGIN:-http://localhost:3004}
       SPEXGRAM_MEDIA_BASE_URL: https://media.spexgram.fgv.local.nu:8443
       API_UPLOADS_ROOT: /data/uploads
+      API_IMPORTS_ROOT: /data/imports
       API_IMMICH_URL: http://immich-server:2283
       API_IMMICH_KEYS_DIR: /data/immich-keys
       API_IMMICH_MEDIA_KEY_DIR: /data/immich-media-key
@@ -112,15 +113,16 @@ services:
       immich-server:
         condition: service_healthy
     volumes:
-      - fgv_spexgram_api_log:/data/log_data
-      - ./data/uploads:/data/uploads
-      - ./data/immich-keys:/data/immich-keys
-      - ./data/immich-media-key:/data/immich-media-key
+      - ${API_DATA:-./.docker/api}/log_data:/data/log_data
+      - ${API_DATA:-./.docker/api}/uploads:/data/uploads
+      - ${API_DATA:-./.docker/api}/immich-keys:/data/immich-keys
+      - ${API_DATA:-./.docker/api}/immich-media-key:/data/immich-media-key
+      - ${API_DATA:-./.docker/api}/imports:/data/imports
     networks:
       - default
       - fgv
     secrets:
-      - source: FGV_SPEXGRAM_MYSQL_USER_PASSWORD
+      - source: MYSQL_USER_PASSWORD
         target: MYSQL_API_USER_PASSWORD
       - API_KEYCLOAK_SERVICE_CLIENT_SECRET
       - API_MEDIA_SIGNING_KEY
@@ -144,7 +146,7 @@ services:
     ports:
       - "127.0.0.1:2283:2283"
     volumes:
-      - ./data/immich:/data
+      - ./.docker/immich/data:/data
     secrets:
       - IMMICH_DB_PASSWORD
 
@@ -157,7 +159,7 @@ services:
       MACHINE_LEARNING_REQUEST_THREADS: 1
     mem_limit: 4g
     volumes:
-      - fgv_spexgram_immich_model_cache:/cache
+      - ./.docker/immich/model_cache:/cache
 
   immich-postgres:
     image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
@@ -175,7 +177,7 @@ services:
       retries: 10
       start_period: 30s
     volumes:
-      - fgv_spexgram_immich_postgres_data:/var/lib/postgresql/data
+      - ./.docker/immich/postgres:/var/lib/postgresql/data
     secrets:
       - IMMICH_DB_PASSWORD
 
@@ -188,38 +190,16 @@ services:
       timeout: 5s
       retries: 10
 
-volumes:
-  fgv_spexgram_mysql_data:
-    driver: local
-    driver_opts:
-      type: none
-      device: .docker/fgv-spexgram-mysql/data
-      o: bind
-  fgv_spexgram_mysql_log:
-    driver: local
-    driver_opts:
-      type: none
-      device: .docker/fgv-spexgram-mysql/log
-      o: bind
-  fgv_spexgram_api_log:
-    driver: local
-    driver_opts:
-      type: none
-      device: .docker/fgv-spexgram-api/log_data
-      o: bind
-  fgv_spexgram_immich_postgres_data:
-  fgv_spexgram_immich_model_cache:
-
 networks:
   fgv:
     name: fgv-local
     external: true
 
 secrets:
-  FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD:
-    file: .docker/secrets/FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD
-  FGV_SPEXGRAM_MYSQL_USER_PASSWORD:
-    file: .docker/secrets/FGV_SPEXGRAM_MYSQL_USER_PASSWORD
+  MYSQL_ROOT_PASSWORD:
+    file: .docker/secrets/MYSQL_ROOT_PASSWORD
+  MYSQL_USER_PASSWORD:
+    file: .docker/secrets/MYSQL_USER_PASSWORD
   API_KEYCLOAK_SERVICE_CLIENT_SECRET:
     file: .docker/secrets/API_KEYCLOAK_SERVICE_CLIENT_SECRET
   API_MEDIA_SIGNING_KEY:

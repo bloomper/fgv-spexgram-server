@@ -17,6 +17,8 @@
 
 package nu.fgv.spexgram.server.admin;
 
+import nu.fgv.spexgram.server.util.StoredText;
+import org.springframework.context.MessageSource;
 import nu.fgv.spexgram.server.audit.AuditEntry;
 import nu.fgv.spexgram.server.audit.AuditFilter;
 import nu.fgv.spexgram.server.audit.AuditService;
@@ -53,6 +55,7 @@ import java.util.Locale;
 @Controller
 public class AdminGraphqlApi {
 
+    private final MessageSource messages;
     private final SettingsService settingsService;
     private final AuditService auditService;
     private final ImmichStatusService immichStatusService;
@@ -62,7 +65,9 @@ public class AdminGraphqlApi {
 
     public AdminGraphqlApi(final SettingsService settingsService, final AuditService auditService,
                            final ImmichStatusService immichStatusService, final ItemService itemService,
-                           final UploadService uploadService, final ViewerService viewerService) {
+                           final UploadService uploadService, final ViewerService viewerService,
+                           final MessageSource messages) {
+        this.messages = messages;
         this.settingsService = settingsService;
         this.auditService = auditService;
         this.immichStatusService = immichStatusService;
@@ -107,14 +112,16 @@ public class AdminGraphqlApi {
 
     @QueryMapping
     public AuditPageDto auditLog(@Argument final @Nullable Integer page, @Argument final @Nullable Integer size,
-                                 @Argument final @Nullable AuditFilter filter) {
+                                 @Argument final @Nullable AuditFilter filter,
+                                 final Locale locale) {
         final int p = page == null ? 0 : page;
         final int s = size == null ? 50 : size;
         final Page<AuditEntry> entries = auditService.page(p, s, filter);
 
         return new AuditPageDto(entries.getContent().stream()
                 .map(entry -> new AuditLogEntryDto(entry.getId(), entry.getAt(), entry.getActorSubject(), entry.getActorName(),
-                        entry.getAction(), entry.getEntityType(), entry.getEntityId(), entry.getSummary()))
+                        entry.getAction(), entry.getEntityType(), entry.getEntityId(),
+                        StoredText.decode(entry.getSummary()).in(messages, locale)))
                 .toList(), entries.getTotalElements(), p, s);
     }
 

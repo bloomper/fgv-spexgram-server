@@ -780,8 +780,10 @@ type ImportItem {
     sourceKey: String!
     id: ID
     outcome: ImportOutcome!
-    message: String
-    warnings: [String!]!
+    "In this language (sv or en); the request's when not given."
+    message(locale: String): String
+    "In this language (sv or en); the request's when not given."
+    warnings(locale: String): [String!]!
 }
 
 enum ImportOutcome {
