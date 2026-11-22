@@ -21,6 +21,7 @@ import nu.fgv.spexgram.server.album.Album;
 import nu.fgv.spexgram.server.album.AlbumRepository;
 import nu.fgv.spexgram.server.album.AlbumService;
 import nu.fgv.spexgram.server.audit.AuditService;
+import nu.fgv.spexgram.server.audit.AuditText;
 import nu.fgv.spexgram.server.immich.ImmichClient;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemsInput;
 import nu.fgv.spexgram.server.util.error.BadRequestException;
@@ -47,6 +48,7 @@ import java.util.Set;
 import static nu.fgv.spexgram.server.util.TestUuids.uuid;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -196,7 +198,7 @@ class ItemServiceTest {
 
         assertThat(dated.getTakenAt()).isEqualTo(LocalDateTime.of(1984, 2, 14, 21, 30));
         assertThat(undated.getTakenAt()).isEqualTo(LocalDateTime.of(1984, 2, 14, 12, 0));
-        verify(auditService).record(eq("UPDATE"), eq("ITEM"), eq(dated.getUuid()), ArgumentMatchers.contains("satte datumet till 1984-02-14"));
+        verify(auditService).record(eq("UPDATE"), eq("ITEM"), eq(dated.getUuid()), argThat(text -> text.toString().contains("audit.item.change.date") && text.toString().contains("1984-02-14")));
     }
 
     @Test

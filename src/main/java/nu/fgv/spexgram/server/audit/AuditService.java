@@ -93,7 +93,7 @@ public class AuditService {
     }
 
     @Transactional
-    public void record(final String action, final String entityType, final @Nullable UUID entityId, final String summary) {
+    public void record(final String action, final String entityType, final @Nullable UUID entityId, final AuditText summary) {
         final AuditEntry entry = new AuditEntry();
         final Caller caller = callerService.currentIfAny().orElse(null);
 
@@ -103,7 +103,7 @@ public class AuditService {
         entry.setAction(action);
         entry.setEntityType(entityType);
         entry.setEntityId(entityId == null ? null : entityId.toString());
-        entry.setSummary(summary.length() > MAX_SUMMARY ? summary.substring(0, MAX_SUMMARY) : summary);
+        entry.setSummary(summary.encode(MAX_SUMMARY));
         repository.save(entry);
     }
 

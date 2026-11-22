@@ -23,6 +23,7 @@ import nu.fgv.spexgram.server.album.AlbumDtos.VisibilityCount;
 import nu.fgv.spexgram.server.album.AlbumRepository;
 import nu.fgv.spexgram.server.album.AlbumService;
 import nu.fgv.spexgram.server.audit.AuditService;
+import nu.fgv.spexgram.server.audit.AuditText;
 import nu.fgv.spexgram.server.immich.ImmichClient;
 import nu.fgv.spexgram.server.item.ItemDtos.ImmichJob;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemDto;
@@ -424,7 +425,7 @@ public class ItemService {
         item.setTakenAt(taken(input.takenAt()));
         item.setLatitude(input.latitude());
         item.setLongitude(input.longitude());
-        auditService.record("UPDATE", "ITEM", item.getUuid(), "Ändrade " + describe(item));
+        auditService.record("UPDATE", "ITEM", item.getUuid(), AuditText.of("audit.item.update", describe(item)));
         return views.toDto(item, viewer);
     }
 
@@ -463,27 +464,26 @@ public class ItemService {
             }
         }
 
-        final List<String> changes = new ArrayList<>();
+        final List<AuditText> changes = new ArrayList<>();
 
         if (input.caption() != null || input.photographer() != null) {
-            changes.add("ändrade bildtext eller fotograf");
+            changes.add(AuditText.of("audit.item.change.text"));
         }
         if (input.visibility() != null) {
-            changes.add("gjorde dem " + switch (input.visibility()) {
-                case UNPUBLISHED -> "opublicerade";
-                case MEMBERS -> "synliga för medlemmar";
-                case PUBLIC -> "publika";
-            });
+            changes.add(AuditText.of("audit.item.change.visibility." + input.visibility().name()));
         }
         if (album != null) {
-            changes.add("flyttade dem till albumet " + album.getTitle());
+            changes.add(AuditText.of("audit.item.change.album", album.getTitle()));
         }
         if (day != null) {
-            changes.add("satte datumet till " + day);
+            changes.add(AuditText.of("audit.item.change.date", day));
         }
+
+        final AuditText changed = changes.stream().reduce((a, b) -> AuditText.of("audit.list", a, b)).orElse(AuditText.of("audit.item.change.none"));
+
         for (final Item item : items) {
             auditService.record(input.visibility() != null ? "VISIBILITY" : "UPDATE", "ITEM", item.getUuid(),
-                    "%s: %s".formatted(describe(item), String.join(", ", changes)));
+                    AuditText.of("audit.item.change", describe(item), changed));
         }
         return new ItemsUpdateResult(toDtos(items, viewer), hidden.size());
     }
@@ -511,7 +511,7 @@ public class ItemService {
         for (final Item item : items) {
             if (!item.isTrashed()) {
                 item.setTrashedAt(clock.instant());
-                auditService.record("TRASH", "ITEM", item.getUuid(), "Lade %s i papperskorgen".formatted(describe(item)));
+                auditService.record("TRASH", "ITEM", item.getUuid(), AuditText.of("audit.item.trash", describe(item)));
             }
         }
         return toDtos(items, viewer);
@@ -528,7 +528,7 @@ public class ItemService {
         for (final Item item : items) {
             if (item.isTrashed()) {
                 item.setTrashedAt(null);
-                auditService.record("RESTORE", "ITEM", item.getUuid(), "Återställde " + describe(item));
+                auditService.record("RESTORE", "ITEM", item.getUuid(), AuditText.of("audit.item.restore", describe(item)));
             }
         }
         return toDtos(items, viewer);
@@ -547,7 +547,7 @@ public class ItemService {
             throw new BadRequestException("error.item.notTrashed");
         }
         deleteWithFiles(items);
-        items.forEach(item -> auditService.record("DELETE", "ITEM", item.getUuid(), "Raderade " + describe(item)));
+        items.forEach(item -> auditService.record("DELETE", "ITEM", item.getUuid(), AuditText.of("audit.item.delete", describe(item))));
     }
 
     /**
@@ -575,7 +575,7 @@ public class ItemService {
 
         deleteWithFiles(items);
         albums.forEach(album -> albumService.deleteWithItems(album, false));
-        auditService.record("DELETE", "TRASH", null, "Tömde papperskorgen: %d album och %d bilder och filmer".formatted(albums.size(), items.size()));
+        auditService.record("DELETE", "TRASH", null, AuditText.of("audit.trash.empty", albums.size(), items.size()));
     }
 
     @Transactional(readOnly = true)

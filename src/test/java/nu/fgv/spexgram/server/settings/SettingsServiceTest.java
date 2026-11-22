@@ -19,6 +19,7 @@ package nu.fgv.spexgram.server.settings;
 import nu.fgv.spexgram.server.TestCallers;
 import nu.fgv.spexgram.server.TestClock;
 import nu.fgv.spexgram.server.audit.AuditService;
+import nu.fgv.spexgram.server.audit.AuditText;
 import nu.fgv.spexgram.server.settings.SettingsService.SettingsDto;
 import nu.fgv.spexgram.server.user.CallerService;
 import nu.fgv.spexgram.server.util.error.BadRequestException;
@@ -93,7 +94,7 @@ class SettingsServiceTest {
 
         assertThat(service.update(new SettingsDto("  Välkommen!  ", " ", "Publik", null, " arkiv@fgv.nu ", 8, 10, 500, 20, true, false)))
                 .isEqualTo(new SettingsDto("Välkommen!", null, "Publik", null, "arkiv@fgv.nu", 8, 10, 500, 20, true, false));
-        verify(auditService).record("UPDATE", "SETTINGS", null, "Ändrade inställningarna");
+        verify(auditService).record("UPDATE", "SETTINGS", null, AuditText.of("audit.settings.update"));
     }
 
     @Test
