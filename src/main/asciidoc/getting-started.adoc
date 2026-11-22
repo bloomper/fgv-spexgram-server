@@ -65,13 +65,13 @@ $ ./scripts/configure-keycloak.sh    # the Keycloak client secrets, read from th
 
 Both keep the values that are already set, so they can be run again, and tell git to leave your values alone so they are never committed (``git update-index --skip-worktree .docker/secrets/*``).
 The database passwords take effect only when the databases are created, i.e. with empty data folders.
-To set a value by hand, write it without a trailing newline, e.g. ``printf '%s' 'verysecret' > .docker/secrets/FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD``.
+To set a value by hand, write it without a trailing newline, e.g. ``printf '%s' 'verysecret' > .docker/secrets/MYSQL_ROOT_PASSWORD``.
 
 |===
 |Parameter|Purpose|Comment|Example value
 
-|FGV_SPEXGRAM_MYSQL_ROOT_PASSWORD|The password for the root user of Spexgram Server's database||verysecret
-|FGV_SPEXGRAM_MYSQL_USER_PASSWORD|The password for the user of Spexgram Server's database||secret
+|MYSQL_ROOT_PASSWORD|The password for the root user of Spexgram Server's database||verysecret
+|MYSQL_USER_PASSWORD|The password for the user of Spexgram Server's database||secret
 |API_KEYCLOAK_SERVICE_CLIENT_SECRET|The client secret of ``fgv-spexgram-service``, with which Spexgram Server calls Spexipedia and reads editors' email addresses in Keycloak|Must match the value in ``realm/fgv.json`` in fgv-keycloak, search for ``fgv-spexgram-service`` and pick the value for ``secret`` in the same section|
 |API_MEDIA_SIGNING_KEY|Signs the media addresses, which the media server checks; shared by ``spexgram-api`` and ``spexgram-media``|A long random string, e.g. from ``openssl rand -base64 32``|
 |API_IMMICH_ADMIN_PASSWORD|The password of Immich's admin, Spexgram's system user, which the API creates in Immich|A long random string|
@@ -85,9 +85,9 @@ There are also configuration parameters in ``.env`` that can be tweaked if so de
 |===
 |Parameter|Purpose|Default value
 
-|FGV_SPEXGRAM_MYSQL_DATABASE|The name of the database used by Spexgram Server|spexgram
-|FGV_SPEXGRAM_MYSQL_ROOT_USER|The root user of Spexgram Server's database|root
-|FGV_SPEXGRAM_MYSQL_USER|The user of Spexgram Server's database|spexgram
+|MYSQL_DATABASE|The name of the database used by Spexgram Server|spexgram
+|MYSQL_ROOT_USER|The root user of Spexgram Server's database|root
+|MYSQL_USER|The user of Spexgram Server's database|spexgram
 |API_KEYCLOAK_REALM|The Keycloak realm of Spexgram Server|fgv
 |API_KEYCLOAK_CLIENT_CLIENT_ID|The Keycloak client id of Spexgram Web|fgv-spexgram
 |API_KEYCLOAK_MCP_CLIENT_ID|The Keycloak client id of MCP clients, the only one whose tokens the MCP endpoint accepts (see <<mcp_server>>)|fgv-spexgram-mcp
@@ -137,7 +137,7 @@ When the ``spexgram-api`` container isn't running, Caddy forwards ``https://api.
 [source,bash]
 ----
 $ docker compose up -d spexgram-mysql immich-server
-$ MYSQL_API_USER_PASSWORD=<FGV_SPEXGRAM_MYSQL_USER_PASSWORD> \
+$ MYSQL_API_USER_PASSWORD=<MYSQL_USER_PASSWORD> \
   API_KEYCLOAK_SERVICE_CLIENT_SECRET=<…> API_MEDIA_SIGNING_KEY=<…> \
   API_IMMICH_ADMIN_PASSWORD=<…> ./gradlew bootRun --args='--spring.profiles.active=local'
 $ docker compose up -d spexgram-media   # once the API has created immich-media-key/media.key
