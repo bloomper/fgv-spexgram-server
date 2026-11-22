@@ -20,7 +20,7 @@ package nu.fgv.spexgram.server.item;
 import lombok.extern.slf4j.Slf4j;
 import nu.fgv.spexgram.server.album.Album;
 import nu.fgv.spexgram.server.audit.AuditService;
-import nu.fgv.spexgram.server.audit.AuditText;
+import nu.fgv.spexgram.server.util.StoredText;
 import nu.fgv.spexgram.server.immich.ImmichClient;
 import nu.fgv.spexgram.server.immich.ImmichRejectedException;
 import nu.fgv.spexgram.server.item.ItemDtos.UploadOutcome;
@@ -148,8 +148,8 @@ public class ItemIntake {
             }
             repository.save(item);
             auditService.record("UPLOAD", "ITEM", item.getUuid(),
-                    contribution ? AuditText.of("audit.item.contribute", upload.fileName(), album.getTitle())
-                    : AuditText.of("audit.item.upload", upload.fileName(), album.getTitle()));
+                    contribution ? StoredText.of("audit.item.contribute", upload.fileName(), album.getTitle())
+                    : StoredText.of("audit.item.upload", upload.fileName(), album.getTitle()));
             return new UploadResult(upload.id(), upload.fileName(), UploadOutcome.CREATED, null, null, null, null);
         }));
 
@@ -195,7 +195,7 @@ public class ItemIntake {
                     throw new java.io.UncheckedIOException(e);
                 }
                 repository.save(found);
-                auditService.record("UPLOAD", "ITEM", found.getUuid(), AuditText.of("audit.item.import", fileName, album.getTitle()));
+                auditService.record("UPLOAD", "ITEM", found.getUuid(), StoredText.of("audit.item.import", fileName, album.getTitle()));
             }
             return found;
         }));
@@ -241,7 +241,7 @@ public class ItemIntake {
             item.setFailure(null);
             item.setProcessingSince(clock.instant());
             auditService.record("UPLOAD", "ITEM", item.getUuid(),
-                    AuditText.of("audit.item.replaceFile", ItemService.describe(item), upload.fileName()));
+                    StoredText.of("audit.item.replaceFile", ItemService.describe(item), upload.fileName()));
         });
         if (old != null && !old.equals(sent.id())) {
             immichClient.delete(List.of(old));

@@ -25,7 +25,7 @@ import nu.fgv.spexgram.server.album.AlbumKindService;
 import nu.fgv.spexgram.server.album.AlbumRepository;
 import nu.fgv.spexgram.server.album.AlbumService;
 import nu.fgv.spexgram.server.audit.AuditService;
-import nu.fgv.spexgram.server.audit.AuditText;
+import nu.fgv.spexgram.server.util.StoredText;
 import nu.fgv.spexgram.server.item.ContributionStatus;
 import nu.fgv.spexgram.server.item.Item;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemDto;
@@ -165,7 +165,7 @@ public class ContributionService {
 
         itemService.deleteWithFiles(List.of(item));
         auditService.record("DELETE", "ITEM", item.getUuid(),
-                AuditText.of("audit.item.withdraw", Objects.requireNonNullElse(item.getOriginalFileName(), "")));
+                StoredText.of("audit.item.withdraw", Objects.requireNonNullElse(item.getOriginalFileName(), "")));
     }
 
     @Transactional(readOnly = true)
@@ -225,7 +225,7 @@ public class ContributionService {
                 item.setVisibility(Visibility.MEMBERS);
             }
             auditService.record("REVIEW", "ITEM", item.getUuid(),
-                    AuditText.of(accept ? "audit.item.accept" : "audit.item.reject", Objects.requireNonNullElse(item.getOriginalFileName(), "")));
+                    StoredText.of(accept ? "audit.item.accept" : "audit.item.reject", Objects.requireNonNullElse(item.getOriginalFileName(), "")));
             result.add(new ContributionReviewDto(review.getUuid(), accept ? item.getUuid() : null, accept, message, review.getReviewedAt()));
         }
         if (!accept) {
@@ -257,7 +257,7 @@ public class ContributionService {
         suggestion.setSuggestedByName(caller.displayName());
         suggestion.setCreatedAt(clock.instant());
         suggestionRepository.save(suggestion);
-        auditService.record("CREATE", "ALBUM", album.getUuid(), AuditText.of("audit.album.propose", album.getTitle()));
+        auditService.record("CREATE", "ALBUM", album.getUuid(), StoredText.of("audit.album.propose", album.getTitle()));
         return toDto(suggestion, false);
     }
 
@@ -299,11 +299,11 @@ public class ContributionService {
             if (accept) {
                 album.setSuggestedBy(null);
                 album.setVisibility(Visibility.MEMBERS);
-                auditService.record("REVIEW", "ALBUM", album.getUuid(), AuditText.of("audit.album.acceptProposal", album.getTitle()));
+                auditService.record("REVIEW", "ALBUM", album.getUuid(), StoredText.of("audit.album.acceptProposal", album.getTitle()));
             } else {
                 suggestion.setAlbum(null);
                 albumService.deleteWithItems(album, false);
-                auditService.record("REVIEW", "ALBUM", album.getUuid(), AuditText.of("audit.album.rejectProposal", album.getTitle()));
+                auditService.record("REVIEW", "ALBUM", album.getUuid(), StoredText.of("audit.album.rejectProposal", album.getTitle()));
             }
         }
         tellSuggester(suggestion);

@@ -20,7 +20,7 @@ package nu.fgv.spexgram.server.report;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import nu.fgv.spexgram.server.audit.AuditService;
-import nu.fgv.spexgram.server.audit.AuditText;
+import nu.fgv.spexgram.server.util.StoredText;
 import nu.fgv.spexgram.server.item.Item;
 import nu.fgv.spexgram.server.item.ItemRepository;
 import nu.fgv.spexgram.server.item.ItemViews;
@@ -185,7 +185,7 @@ public class ReportService {
             }
             repository.save(report);
             auditService.record("REPORT", "ITEM", item.getUuid(),
-                    AuditText.of("audit.item.report." + (visitor ? "visitor" : "member") + (report.getHiddenFrom() != null ? "Hidden" : ""), caption(item)));
+                    StoredText.of("audit.item.report." + (visitor ? "visitor" : "member") + (report.getHiddenFrom() != null ? "Hidden" : ""), caption(item)));
             return toDto(report, false);
         }));
 
@@ -248,7 +248,7 @@ public class ReportService {
                 } else if (report.getHiddenFrom() != null) {
                     showAgain(report, item);
                 }
-                auditService.record("REPORT", "ITEM", item.getUuid(), AuditText.of("audit.item.reportHandled." + outcome.name(), caption(item)));
+                auditService.record("REPORT", "ITEM", item.getUuid(), StoredText.of("audit.item.reportHandled." + outcome.name(), caption(item)));
             }
             return report;
         }));

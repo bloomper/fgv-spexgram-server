@@ -17,6 +17,8 @@
 package nu.fgv.spexgram.server.spex;
 
 import nu.fgv.spexgram.server.config.CacheConfig;
+import nu.fgv.spexgram.server.util.StoredText;
+import nu.fgv.spexgram.server.util.TextException;
 import org.jspecify.annotations.Nullable;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -70,7 +72,7 @@ public class SpexipediaClient {
 
     private static void requireValid(final ClientGraphQlResponse response) {
         if (!response.getErrors().isEmpty() || !response.isValid()) {
-            throw new SpexipediaCallException("Response has errors: " + response.getErrors());
+            throw new SpexipediaCallException(StoredText.of("spexipedia.answeredWithErrors", response.getErrors()), null);
         }
     }
 
@@ -81,7 +83,7 @@ public class SpexipediaClient {
             throw e;
         } catch (final RuntimeException e) {
             if (e instanceof RestClientException || e.getClass().getName().startsWith("org.springframework.graphql")) {
-                throw new SpexipediaCallException(e.getMessage() == null ? e.getClass().getName() : e.getMessage(), e);
+                throw new SpexipediaCallException(StoredText.of("spexipedia.unreachable", e.getMessage() == null ? e.getClass().getName() : e.getMessage()), e);
             }
             throw e;
         }
@@ -152,14 +154,14 @@ public class SpexipediaClient {
     /**
      * Spexipedia could not be reached or answered with errors.
      */
-    public static class SpexipediaCallException extends RuntimeException {
+    public static class SpexipediaCallException extends TextException {
 
-        public SpexipediaCallException(final String message) {
-            super(message);
+        public SpexipediaCallException(final StoredText text, final @Nullable Throwable cause) {
+            super(text, cause);
         }
 
-        public SpexipediaCallException(final String message, final Throwable cause) {
-            super(message, cause);
+        public SpexipediaCallException(final String message) {
+            this(StoredText.of("text.unexpected", message), null);
         }
     }
 }

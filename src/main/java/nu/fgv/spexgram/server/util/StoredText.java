@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package nu.fgv.spexgram.server.audit;
+package nu.fgv.spexgram.server.util;
 
 import nu.fgv.spexgram.server.util.Locales;
 import org.jspecify.annotations.Nullable;
@@ -30,35 +30,35 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * An audit entry's summary: a message code of {@code messages*.properties} with its arguments, put in the reader's
- * language when the log is read. An argument is a name or title as it is, or another text, e.g. how an album's
- * visibility was changed. Stored as JSON in the summary column, so the log's search finds the names and titles;
- * entries written before summaries were codes are shown as they are.
+ * A text kept in the database that a user reads later, such as an audit entry's summary or why a job failed: a
+ * message code of {@code messages*.properties} with its arguments, put in the reader's language when it is read. An
+ * argument is a name or title as it is, a count, or another text. Stored as JSON, so a search finds the names and
+ * titles; a text written before texts were codes is shown as it is.
  *
  * @param code the message code
- * @param args the arguments: {@link String}, {@link Long} (a count, for plural forms) or {@link AuditText}
+ * @param args the arguments: {@link String}, {@link Long} (a count, for plural forms) or {@link StoredText}
  *
  * @author Anders Jacobsson
  * @since 1.0
  */
-public record AuditText(String code, List<Object> args) {
+public record StoredText(String code, List<Object> args) {
 
-    static final String STORED = "audit.stored";
+    static final String STORED = "text.stored";
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final int MAX_ARG = 300;
 
-    public AuditText {
+    public StoredText {
         args = List.copyOf(args);
     }
 
     /** A text; whole numbers are kept as numbers, other arguments that are not texts as strings ({@code null} as empty). */
-    public static AuditText of(final String code, final @Nullable Object... args) {
-        return new AuditText(code, args == null ? List.of() : Arrays.stream(args).map(AuditText::arg).toList());
+    public static StoredText of(final String code, final @Nullable Object... args) {
+        return new StoredText(code, args == null ? List.of() : Arrays.stream(args).map(StoredText::arg).toList());
     }
 
     private static Object arg(final @Nullable Object arg) {
         return switch (arg) {
-            case final AuditText text -> text;
+            case final StoredText text -> text;
             case final Integer n -> n.longValue();
             case final Long n -> n;
             case null -> "";
@@ -72,7 +72,7 @@ public record AuditText(String code, List<Object> args) {
             return args.isEmpty() ? "" : String.valueOf(args.getFirst());
         }
 
-        final Object[] rendered = args.stream().map(arg -> arg instanceof AuditText text ? text.in(messages, locale) : arg).toArray();
+        final Object[] rendered = args.stream().map(arg -> arg instanceof StoredText text ? text.in(messages, locale) : arg).toArray();
 
         return messages.getMessage(code, rendered, code, Locales.supported(locale));
     }
@@ -85,7 +85,7 @@ public record AuditText(String code, List<Object> args) {
     }
 
     /** What {@link #encode} wrote; any other text is a summary from before, shown as it is. */
-    public static AuditText decode(final String stored) {
+    public static StoredText decode(final String stored) {
         if (stored.startsWith("{\"c\":")) {
             try {
                 return of(JSON.readTree(stored));
@@ -93,7 +93,7 @@ public record AuditText(String code, List<Object> args) {
                 // Not one of ours after all
             }
         }
-        return new AuditText(STORED, List.of(stored));
+        return new StoredText(STORED, List.of(stored));
     }
 
     private ObjectNode node(final int maxArg) {
@@ -101,7 +101,7 @@ public record AuditText(String code, List<Object> args) {
         final ArrayNode array = node.put("c", code).putArray("a");
 
         for (final Object arg : args) {
-            if (arg instanceof AuditText text) {
+            if (arg instanceof StoredText text) {
                 array.add(text.node(maxArg));
             } else if (arg instanceof Long n) {
                 array.add(n);
@@ -114,12 +114,12 @@ public record AuditText(String code, List<Object> args) {
         return node;
     }
 
-    private static AuditText of(final JsonNode node) {
+    private static StoredText of(final JsonNode node) {
         final List<Object> args = new ArrayList<>();
 
         for (final JsonNode arg : node.get("a")) {
             args.add(arg.isObject() ? of(arg) : arg.isIntegralNumber() ? (Object) arg.asLong() : arg.asString());
         }
-        return new AuditText(node.get("c").asString(), args);
+        return new StoredText(node.get("c").asString(), args);
     }
 }

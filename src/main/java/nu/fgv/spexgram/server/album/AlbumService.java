@@ -29,7 +29,7 @@ import nu.fgv.spexgram.server.album.AlbumDtos.AlbumVisibilityResult;
 import nu.fgv.spexgram.server.album.AlbumDtos.CategoryDto;
 import nu.fgv.spexgram.server.album.AlbumDtos.PlaceDto;
 import nu.fgv.spexgram.server.audit.AuditService;
-import nu.fgv.spexgram.server.audit.AuditText;
+import nu.fgv.spexgram.server.util.StoredText;
 import nu.fgv.spexgram.server.immich.ImmichClient;
 import nu.fgv.spexgram.server.item.ContributionStatus;
 import nu.fgv.spexgram.server.item.Item;
@@ -425,7 +425,7 @@ public class AlbumService {
 
         apply(album, input, kindService.kindOrDefault(input.kindId()));
         repository.save(album);
-        auditService.record("CREATE", "ALBUM", album.getUuid(), AuditText.of("audit.album.create", album.getTitle()));
+        auditService.record("CREATE", "ALBUM", album.getUuid(), StoredText.of("audit.album.create", album.getTitle()));
         return toDto(album);
     }
 
@@ -434,7 +434,7 @@ public class AlbumService {
         final Album album = editable(id);
 
         apply(album, input, input.kindId() == null ? album.getKind() : kindService.kindOrDefault(input.kindId()));
-        auditService.record("UPDATE", "ALBUM", album.getUuid(), AuditText.of("audit.album.update", album.getTitle()));
+        auditService.record("UPDATE", "ALBUM", album.getUuid(), StoredText.of("audit.album.update", album.getTitle()));
         return toDto(album);
     }
 
@@ -520,8 +520,8 @@ public class AlbumService {
             }
         }
         auditService.record("VISIBILITY", "ALBUM", album.getUuid(),
-                AuditText.of(items ? "audit.album.visibilityWithItems" : "audit.album.visibility", album.getTitle(),
-                AuditText.of("audit.visibility." + visibility.name())));
+                StoredText.of(items ? "audit.album.visibilityWithItems" : "audit.album.visibility", album.getTitle(),
+                StoredText.of("audit.visibility." + visibility.name())));
         return new AlbumVisibilityResult(toDto(album), skipped);
     }
 
@@ -539,7 +539,7 @@ public class AlbumService {
 
             album.setCoverItemId(item.getId());
         }
-        auditService.record("UPDATE", "ALBUM", album.getUuid(), AuditText.of("audit.album.cover", album.getTitle()));
+        auditService.record("UPDATE", "ALBUM", album.getUuid(), StoredText.of("audit.album.cover", album.getTitle()));
         return toDto(album);
     }
 
@@ -549,7 +549,7 @@ public class AlbumService {
 
         if (!album.isTrashed()) {
             album.setTrashedAt(clock.instant());
-            auditService.record("TRASH", "ALBUM", album.getUuid(), AuditText.of("audit.album.trash", album.getTitle()));
+            auditService.record("TRASH", "ALBUM", album.getUuid(), StoredText.of("audit.album.trash", album.getTitle()));
         }
         return toDto(album);
     }
@@ -560,7 +560,7 @@ public class AlbumService {
 
         if (album.isTrashed()) {
             album.setTrashedAt(null);
-            auditService.record("RESTORE", "ALBUM", album.getUuid(), AuditText.of("audit.album.restore", album.getTitle()));
+            auditService.record("RESTORE", "ALBUM", album.getUuid(), StoredText.of("audit.album.restore", album.getTitle()));
         }
         return toDto(album);
     }
@@ -579,7 +579,7 @@ public class AlbumService {
         }
         deleteWithItems(album, keepItems);
         auditService.record("DELETE", "ALBUM", album.getUuid(),
-                AuditText.of(keepItems ? "audit.album.deleteKeepItems" : "audit.album.delete", album.getTitle()));
+                StoredText.of(keepItems ? "audit.album.deleteKeepItems" : "audit.album.delete", album.getTitle()));
     }
 
     /**
@@ -625,7 +625,7 @@ public class AlbumService {
                 return false;
             }
             deleteWithItems(album, false);
-            auditService.record("DELETE", "ALBUM", id, AuditText.of("audit.album.forgetImported", album.getTitle()));
+            auditService.record("DELETE", "ALBUM", id, StoredText.of("audit.album.forgetImported", album.getTitle()));
             return true;
         }
 

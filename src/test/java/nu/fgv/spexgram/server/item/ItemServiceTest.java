@@ -21,7 +21,7 @@ import nu.fgv.spexgram.server.album.Album;
 import nu.fgv.spexgram.server.album.AlbumRepository;
 import nu.fgv.spexgram.server.album.AlbumService;
 import nu.fgv.spexgram.server.audit.AuditService;
-import nu.fgv.spexgram.server.audit.AuditText;
+import nu.fgv.spexgram.server.util.StoredText;
 import nu.fgv.spexgram.server.immich.ImmichClient;
 import nu.fgv.spexgram.server.item.ItemDtos.ItemsInput;
 import nu.fgv.spexgram.server.util.error.BadRequestException;

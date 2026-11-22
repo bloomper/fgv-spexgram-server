@@ -17,7 +17,7 @@
 
 package nu.fgv.spexgram.server.admin;
 
-import nu.fgv.spexgram.server.audit.AuditText;
+import nu.fgv.spexgram.server.util.StoredText;
 import org.springframework.context.MessageSource;
 import nu.fgv.spexgram.server.audit.AuditEntry;
 import nu.fgv.spexgram.server.audit.AuditFilter;
@@ -121,7 +121,7 @@ public class AdminGraphqlApi {
         return new AuditPageDto(entries.getContent().stream()
                 .map(entry -> new AuditLogEntryDto(entry.getId(), entry.getAt(), entry.getActorSubject(), entry.getActorName(),
                         entry.getAction(), entry.getEntityType(), entry.getEntityId(),
-                        AuditText.decode(entry.getSummary()).in(messages, locale)))
+                        StoredText.decode(entry.getSummary()).in(messages, locale)))
                 .toList(), entries.getTotalElements(), p, s);
     }
 

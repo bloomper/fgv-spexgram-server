@@ -20,7 +20,7 @@ package nu.fgv.spexgram.server.item;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import nu.fgv.spexgram.server.audit.AuditService;
-import nu.fgv.spexgram.server.audit.AuditText;
+import nu.fgv.spexgram.server.util.StoredText;
 import nu.fgv.spexgram.server.immich.ImmichClient;
 import nu.fgv.spexgram.server.immich.ImmichUnavailableException;
 import nu.fgv.spexgram.server.settings.SettingsService;
@@ -222,7 +222,7 @@ public class ItemProcessing {
             found.incrementAndGet();
         });
         if (found.get() > 0) {
-            auditService.record("CREATE", "ITEM", null, AuditText.of("audit.item.foundInImmich", found.get()));
+            auditService.record("CREATE", "ITEM", null, StoredText.of("audit.item.foundInImmich", found.get()));
             log.info("Found {} unsorted items in Immich", found.get());
         }
     }
