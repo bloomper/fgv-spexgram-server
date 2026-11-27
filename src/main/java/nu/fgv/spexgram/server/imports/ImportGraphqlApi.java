@@ -57,13 +57,17 @@ public class ImportGraphqlApi {
         return service.forget(sourcePrefix);
     }
 
-    /** The record's message in the language asked for, else the request's. */
+    /**
+     * The record's message in the language asked for, else the request's.
+     */
     @SchemaMapping(typeName = "ImportItem", field = "message")
     public @Nullable String message(final ItemResult item, @Argument final @Nullable String locale, final Locale requested) {
         return item.message() == null ? null : item.message().in(messages, locale(locale, requested));
     }
 
-    /** The record's warnings in the language asked for, else the request's. */
+    /**
+     * The record's warnings in the language asked for, else the request's.
+     */
     @SchemaMapping(typeName = "ImportItem", field = "warnings")
     public List<String> warnings(final ItemResult item, @Argument final @Nullable String locale, final Locale requested) {
         final Locale in = locale(locale, requested);
@@ -75,7 +79,8 @@ public class ImportGraphqlApi {
         return asked == null || asked.isBlank() ? requested : Locale.forLanguageTag(asked.strip());
     }
 
-    public record ImportResult(boolean dryRun, List<ItemResult> items, int created, int updated, int unchanged, int kept,
+    public record ImportResult(boolean dryRun, List<ItemResult> items, int created, int updated, int unchanged,
+                               int kept,
                                int failed) {
 
         public static ImportResult of(final boolean dryRun, final List<ItemResult> items) {

@@ -32,7 +32,6 @@ import java.util.Locale;
  *
  * @param code the message code
  * @param args the arguments
- *
  * @author Anders Jacobsson
  * @since 1.0
  */
@@ -42,7 +41,9 @@ public record ImportText(String code, List<String> args) {
         return new ImportText(code, args == null ? List.of() : Arrays.stream(args).map(String::valueOf).toList());
     }
 
-    /** The text in the locale's language, Swedish unless English was asked for. */
+    /**
+     * The text in the locale's language, Swedish unless English was asked for.
+     */
     public String in(final MessageSource messages, final @Nullable Locale locale) {
         return messages.getMessage(code, args.toArray(), code, Locales.supported(locale));
     }

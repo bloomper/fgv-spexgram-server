@@ -41,7 +41,8 @@ public final class ItemDtos {
      *
      * @param albumId the album, when the viewer may see it
      */
-    public record ItemDto(UUID id, @Nullable UUID albumId, ItemType type, ItemStatus status, @Nullable ItemFailure failure,
+    public record ItemDto(UUID id, @Nullable UUID albumId, ItemType type, ItemStatus status,
+                          @Nullable ItemFailure failure,
                           @Nullable String takenAt, @Nullable String caption, @Nullable String photographer,
                           @Nullable Double latitude, @Nullable Double longitude, @Nullable Integer width,
                           @Nullable Integer height, @Nullable Long durationMs, Visibility visibility,

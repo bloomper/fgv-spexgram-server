@@ -446,7 +446,8 @@ public class ImmichClient {
      * @param thumbhash null until Immich has made the thumbnail
      * @param takenAt   when it was taken, in local time
      */
-    public record Asset(UUID id, boolean video, @Nullable Instant createdAt, @Nullable String thumbhash, @Nullable LocalDateTime takenAt,
+    public record Asset(UUID id, boolean video, @Nullable Instant createdAt, @Nullable String thumbhash,
+                        @Nullable LocalDateTime takenAt,
                         @Nullable Integer width, @Nullable Integer height, @Nullable Long durationMs,
                         @Nullable Long fileSize, @Nullable Double latitude, @Nullable Double longitude,
                         String originalFileName) {

@@ -67,7 +67,8 @@ public record SpexgramProperties(String timeZone,
      * @param uploads       the folder of unfinished uploads
      * @param maxUploadSize the largest file the deployment accepts; admins can lower it
      */
-    public record Media(String baseUrl, String signingKey, Duration linkValidity, Path uploads, DataSize maxUploadSize) {
+    public record Media(String baseUrl, String signingKey, Duration linkValidity, Path uploads,
+                        DataSize maxUploadSize) {
     }
 
     /**
@@ -80,7 +81,8 @@ public record SpexgramProperties(String timeZone,
      * @param clipModel     the multilingual CLIP model for search by content
      * @param startupWait   how long the API waits for Immich at start before it keeps trying in the background
      */
-    public record Immich(String url, String adminEmail, String adminPassword, Path keysDir, @Nullable Path mediaKeyDir, String clipModel,
+    public record Immich(String url, String adminEmail, String adminPassword, Path keysDir, @Nullable Path mediaKeyDir,
+                         String clipModel,
                          Duration startupWait) {
     }
 

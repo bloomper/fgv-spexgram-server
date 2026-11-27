@@ -58,7 +58,9 @@ public class AlbumKind extends AbstractAuditable {
     @Column(name = "name_en", nullable = false)
     private String nameEn;
 
-    /** Other spellings the import recognises, one per line. */
+    /**
+     * Other spellings the import recognises, one per line.
+     */
     @Column(name = "aliases", nullable = false)
     private String aliases = "";
 

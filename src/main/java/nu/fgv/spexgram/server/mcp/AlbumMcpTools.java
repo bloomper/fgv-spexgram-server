@@ -200,7 +200,8 @@ public class AlbumMcpTools {
      * @param category   e.g. Chalmersspexet
      * @param albumCount how many public albums are about it, where listed
      */
-    public record Spex(UUID id, @Nullable String title, @Nullable Integer year, boolean revival, @Nullable UUID originalId,
+    public record Spex(UUID id, @Nullable String title, @Nullable Integer year, boolean revival,
+                       @Nullable UUID originalId,
                        @Nullable String category, @Nullable Integer albumCount) {
     }
 
@@ -211,7 +212,8 @@ public class AlbumMcpTools {
      * @param itemCount how many public photos and videos it has
      * @param url       its page in Spexgram Web
      */
-    public record AlbumSummary(UUID id, String title, List<Spex> spex, @Nullable Integer year, @Nullable String dateFrom,
+    public record AlbumSummary(UUID id, String title, List<Spex> spex, @Nullable Integer year,
+                               @Nullable String dateFrom,
                                @Nullable String dateTo, int itemCount, @Nullable String url) {
     }
 
@@ -224,8 +226,10 @@ public class AlbumMcpTools {
      * @param kind   the kind of album in English, e.g. Show
      * @param kindSv the kind in Swedish
      */
-    public record AlbumDetail(UUID id, String title, String kind, String kindSv, List<Spex> spex, @Nullable Integer year,
-                              @Nullable String dateFrom, @Nullable String dateTo, @Nullable String place, @Nullable String description,
+    public record AlbumDetail(UUID id, String title, String kind, String kindSv, List<Spex> spex,
+                              @Nullable Integer year,
+                              @Nullable String dateFrom, @Nullable String dateTo, @Nullable String place,
+                              @Nullable String description,
                               int itemCount, @Nullable String url) {
     }
 }

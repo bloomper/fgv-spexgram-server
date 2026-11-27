@@ -149,7 +149,7 @@ public class ItemIntake {
             repository.save(item);
             auditService.record("UPLOAD", "ITEM", item.getUuid(),
                     contribution ? StoredText.of("audit.item.contribute", upload.fileName(), album.getTitle())
-                    : StoredText.of("audit.item.upload", upload.fileName(), album.getTitle()));
+                            : StoredText.of("audit.item.upload", upload.fileName(), album.getTitle()));
             return new UploadResult(upload.id(), upload.fileName(), UploadOutcome.CREATED, null, null, null, null);
         }));
 

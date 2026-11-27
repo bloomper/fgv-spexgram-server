@@ -51,13 +51,17 @@ public class SyncGraphqlApi {
         return sync.status();
     }
 
-    /** Why the latest pull failed, in the reader's language. */
+    /**
+     * Why the latest pull failed, in the reader's language.
+     */
     @SchemaMapping(typeName = "SpexipediaSyncStatus", field = "lastError")
     public @Nullable String lastError(final SpexipediaSync.Status status, final Locale locale) {
         return status.lastError() == null ? null : StoredText.decode(status.lastError()).in(messages, locale);
     }
 
-    /** Why a change was skipped, in the reader's language. */
+    /**
+     * Why a change was skipped, in the reader's language.
+     */
     @SchemaMapping(typeName = "SpexipediaSyncSkipped", field = "error")
     public String error(final SpexipediaSync.Skipped skipped, final Locale locale) {
         return StoredText.decode(skipped.error()).in(messages, locale);

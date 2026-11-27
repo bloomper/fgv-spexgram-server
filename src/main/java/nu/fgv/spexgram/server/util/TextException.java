@@ -48,12 +48,16 @@ public class TextException extends RuntimeException {
         return text;
     }
 
-    /** For a method that throws {@link IOException}: one whose cause carries the text. */
+    /**
+     * For a method that throws {@link IOException}: one whose cause carries the text.
+     */
     public static IOException io(final StoredText text, final @Nullable Throwable cause) {
         return new IOException(text.code() + " " + text.args(), new TextException(text, cause));
     }
 
-    /** The exception's text, or for any other exception "unexpected error" with its details. */
+    /**
+     * The exception's text, or for any other exception "unexpected error" with its details.
+     */
     public static StoredText text(final Throwable e) {
         for (Throwable t = e; t != null; t = t.getCause()) {
             if (t instanceof TextException failure) {

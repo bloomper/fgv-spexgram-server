@@ -62,7 +62,9 @@ public class UploadService {
     public static final long MAX_CHUNK = 60L * 1024 * 1024;
     private static final Duration KEEP = Duration.ofHours(24);
     private static final int MAX_FILE_NAME = 255;
-    /** Open uploads a member may hold at once; editors are not limited. */
+    /**
+     * Open uploads a member may hold at once; editors are not limited.
+     */
     static final int MAX_OPEN_PER_MEMBER = 10;
 
     private final UploadSessionRepository repository;
