@@ -36,10 +36,12 @@ public final class ImportRecords {
     public record FileRef(String sha256, @Nullable String name) {
     }
 
-    public record Batch(@Nullable Boolean createMissingKinds, @Nullable List<ImportAlbum> albums, @Nullable List<ImportItem> items) {
+    public record Batch(@Nullable Boolean createMissingKinds, @Nullable List<ImportAlbum> albums,
+                        @Nullable List<ImportItem> items) {
     }
 
-    public record ImportAlbum(String sourceKey, @Nullable List<UUID> spexIds, @Nullable String kind, @Nullable String title,
+    public record ImportAlbum(String sourceKey, @Nullable List<UUID> spexIds, @Nullable String kind,
+                              @Nullable String title,
                               @Nullable String dateFrom, @Nullable String dateTo, @Nullable String place,
                               @Nullable String description) {
     }

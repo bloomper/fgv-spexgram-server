@@ -225,7 +225,7 @@ public class AlbumKindService {
             return java.util.Optional.empty();
         }
         return repository.findAllByOrderByPositionAscIdAsc().stream().filter(kind -> normalize(kind.getNameSv()).equals(wanted)
-                || normalize(kind.getNameEn()).equals(wanted) || kind.aliasList().stream().anyMatch(alias -> normalize(alias).equals(wanted)))
+                        || normalize(kind.getNameEn()).equals(wanted) || kind.aliasList().stream().anyMatch(alias -> normalize(alias).equals(wanted)))
                 .findFirst();
     }
 

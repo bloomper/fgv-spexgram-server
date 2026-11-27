@@ -37,7 +37,6 @@ import java.util.Locale;
  *
  * @param code the message code
  * @param args the arguments: {@link String}, {@link Long} (a count, for plural forms) or {@link StoredText}
- *
  * @author Anders Jacobsson
  * @since 1.0
  */
@@ -51,7 +50,9 @@ public record StoredText(String code, List<Object> args) {
         args = List.copyOf(args);
     }
 
-    /** A text; whole numbers are kept as numbers, other arguments that are not texts as strings ({@code null} as empty). */
+    /**
+     * A text; whole numbers are kept as numbers, other arguments that are not texts as strings ({@code null} as empty).
+     */
     public static StoredText of(final String code, final @Nullable Object... args) {
         return new StoredText(code, args == null ? List.of() : Arrays.stream(args).map(StoredText::arg).toList());
     }
@@ -66,7 +67,9 @@ public record StoredText(String code, List<Object> args) {
         };
     }
 
-    /** The summary in the locale's language, Swedish unless English was asked for. */
+    /**
+     * The summary in the locale's language, Swedish unless English was asked for.
+     */
     public String in(final MessageSource messages, final @Nullable Locale locale) {
         if (STORED.equals(code)) {
             return args.isEmpty() ? "" : String.valueOf(args.getFirst());
@@ -77,14 +80,18 @@ public record StoredText(String code, List<Object> args) {
         return messages.getMessage(code, rendered, code, Locales.supported(locale));
     }
 
-    /** For the summary column; long arguments are cut so it fits in {@code max} characters. */
+    /**
+     * For the summary column; long arguments are cut so it fits in {@code max} characters.
+     */
     public String encode(final int max) {
         final String full = JSON.writeValueAsString(node(Integer.MAX_VALUE));
 
         return full.length() <= max ? full : JSON.writeValueAsString(node(MAX_ARG));
     }
 
-    /** What {@link #encode} wrote; any other text is a summary from before, shown as it is. */
+    /**
+     * What {@link #encode} wrote; any other text is a summary from before, shown as it is.
+     */
     public static StoredText decode(final String stored) {
         if (stored.startsWith("{\"c\":")) {
             try {

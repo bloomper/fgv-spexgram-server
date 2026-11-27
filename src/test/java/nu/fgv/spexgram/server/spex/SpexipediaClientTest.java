@@ -20,7 +20,6 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
 import org.springframework.graphql.client.HttpSyncGraphQlClient;
 import org.springframework.web.client.RestClient;
 

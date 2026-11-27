@@ -43,10 +43,10 @@ public enum Visibility {
      * is public on its own in an album for members. Nothing in an unpublished or trashed album is shown outside the
      * editors, and neither is a trashed or unsorted item.
      *
-     * @param album         the album's visibility, or null for an unsorted item
-     * @param albumTrashed  whether the album is in the trash
-     * @param item          the item's own visibility
-     * @param itemTrashed   whether the item is in the trash
+     * @param album        the album's visibility, or null for an unsorted item
+     * @param albumTrashed whether the album is in the trash
+     * @param item         the item's own visibility
+     * @param itemTrashed  whether the item is in the trash
      */
     public static Visibility effective(final @org.jspecify.annotations.Nullable Visibility album, final boolean albumTrashed,
                                        final Visibility item, final boolean itemTrashed) {

@@ -63,6 +63,6 @@ class MessagesTest {
         source.setDefaultEncoding("UTF-8");
 
         assertThat(source.getMessage("error.import.hash", new Object[]{"abc"}, Locale.ENGLISH))
-            .isEqualTo("The file's content does not match abc.");
+                .isEqualTo("The file's content does not match abc.");
     }
 }

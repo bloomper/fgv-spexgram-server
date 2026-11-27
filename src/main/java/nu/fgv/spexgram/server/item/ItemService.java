@@ -75,9 +75,13 @@ import java.util.stream.Collectors;
 @Service
 public class ItemService {
 
-    /** The largest page of an album's items, for visitors and members, who may ask for one per album of a page. */
+    /**
+     * The largest page of an album's items, for visitors and members, who may ask for one per album of a page.
+     */
     static final int MAX_PAGE = 100;
-    /** The largest page for editors, whose album page lists every item at once. */
+    /**
+     * The largest page for editors, whose album page lists every item at once.
+     */
     static final int MAX_EDITOR_PAGE = 500;
     static final int MAX_IDS = 200;
     static final int MAX_BULK = 1000;

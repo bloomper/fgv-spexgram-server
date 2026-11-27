@@ -79,11 +79,17 @@ import java.util.stream.Collectors;
 public class AlbumService {
 
     static final int MAX_SPEX = 10;
-    /** How far from today's date a premiere may be to be remembered. */
+    /**
+     * How far from today's date a premiere may be to be remembered.
+     */
     static final int MAX_PREMIERE_DAYS = 31;
-    /** The largest page of albums for visitors and members; with up to 100 items each, a query stays bounded. */
+    /**
+     * The largest page of albums for visitors and members; with up to 100 items each, a query stays bounded.
+     */
     static final int MAX_PAGE = 50;
-    /** The largest page for editors, whose album pickers list every album. */
+    /**
+     * The largest page for editors, whose album pickers list every album.
+     */
     static final int MAX_EDITOR_PAGE = 500;
     private static final int MAX_TEXT = 255;
     private static final Sort NEWEST_FIRST = Sort.by(Sort.Order.desc("dateFrom").nullsLast(), Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
@@ -521,7 +527,7 @@ public class AlbumService {
         }
         auditService.record("VISIBILITY", "ALBUM", album.getUuid(),
                 StoredText.of(items ? "audit.album.visibilityWithItems" : "audit.album.visibility", album.getTitle(),
-                StoredText.of("audit.visibility." + visibility.name())));
+                        StoredText.of("audit.visibility." + visibility.name())));
         return new AlbumVisibilityResult(toDto(album), skipped);
     }
 
@@ -602,7 +608,9 @@ public class AlbumService {
         repository.delete(album);
     }
 
-    /** The optimistic-lock version of an album or an item, or null when it is gone. */
+    /**
+     * The optimistic-lock version of an album or an item, or null when it is gone.
+     */
     @Transactional(readOnly = true)
     public @Nullable Long recordVersion(final UUID id) {
         return repository.findByUuid(id).map(Album::getVersion)

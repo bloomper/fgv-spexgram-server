@@ -84,7 +84,9 @@ public class ImportEngine {
      */
     public interface Handler<T> {
 
-        /** The kind of record, e.g. {@code NUMBER}, as kept in {@code import_key}. */
+        /**
+         * The kind of record, e.g. {@code NUMBER}, as kept in {@code import_key}.
+         */
         String kind();
 
         String sourceKey(T record);
@@ -95,7 +97,9 @@ public class ImportEngine {
          */
         UUID apply(T record, @Nullable UUID existing, Batch batch);
 
-        /** The record's optimistic-lock version, or null when it is gone. */
+        /**
+         * The record's optimistic-lock version, or null when it is gone.
+         */
         @Nullable Long version(UUID id);
 
         /**
@@ -128,7 +132,9 @@ public class ImportEngine {
             return createMissingKinds;
         }
 
-        /** A warning about the record being imported: a message code and its arguments. */
+        /**
+         * A warning about the record being imported: a message code and its arguments.
+         */
         public void warn(final String code, final Object... args) {
             warnings.add(ImportText.of(code, args));
         }
@@ -153,13 +159,18 @@ public class ImportEngine {
         CREATED,
         UPDATED,
         UNCHANGED,
-        /** An editor changed or removed the record since it was imported, so the import left it alone. */
+        /**
+         * An editor changed or removed the record since it was imported, so the import left it alone.
+         */
         KEPT,
         FAILED
     }
 
-    /** One record's outcome; its message and warnings are put in a language when read (ImportGraphqlApi). */
-    public record ItemResult(String kind, String sourceKey, @Nullable UUID id, Outcome outcome, @Nullable ImportText message,
+    /**
+     * One record's outcome; its message and warnings are put in a language when read (ImportGraphqlApi).
+     */
+    public record ItemResult(String kind, String sourceKey, @Nullable UUID id, Outcome outcome,
+                             @Nullable ImportText message,
                              List<ImportText> warnings) {
     }
 
