@@ -107,7 +107,7 @@ dependencies {
     integrationTestImplementation 'org.springframework.boot:spring-boot-testcontainers'
     integrationTestImplementation 'org.testcontainers:testcontainers-junit-jupiter'
     integrationTestImplementation 'org.testcontainers:testcontainers-mysql'
-    integrationTestImplementation 'com.github.dasniko:testcontainers-keycloak:4.4.0'
+    integrationTestImplementation 'com.github.dasniko:testcontainers-keycloak:4.4.1'
     integrationTestImplementation 'com.icegreen:greenmail-junit5:2.1.15'
 
     runtimeOnly 'com.mysql:mysql-connector-j'
